@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="description" content="Zoo Keeper — Jeu de capture de territoire en style monochrome">
+    <title>Zoo Keeper</title>
+    <style>
+        :root {
+            --color-bg: #fafafa;
+            --color-fg: #1a1a1a;
+            --color-muted: #999;
+            --color-trail: #bbb;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --color-bg: #121212;
+                --color-fg: #e0e0e0;
+                --color-muted: #666;
+                --color-trail: #555;
+            }
+        }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: var(--color-bg);
+            color: var(--color-fg);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 100vh; overflow: hidden;
+        }
+        #game-container { position: relative; display: flex; flex-direction: column; align-items: center; }
+        #info { font-size: 1.1rem; font-variant-numeric: tabular-nums; margin-bottom: 0.75rem; }
+        #game-svg { display: block; border: 1px solid var(--color-fg); }
+        .svg-bg { fill: var(--color-fg); }
+        .svg-field { fill: var(--color-bg); stroke: none; }
+        .svg-trail { fill: none; stroke: var(--color-trail); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .svg-ball { fill: var(--color-fg); }
+        .svg-player { fill: var(--color-fg); }
+        #overlay {
+            position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+            background: var(--color-bg); opacity: 0.92; text-align: center;
+        }
+        #overlay.hidden { display: none; }
+        #overlay-text p { margin-bottom: 0.5rem; }
+        #game-over-text { font-size: 1.5rem; font-weight: 700; }
+        #restart-hint { font-size: 0.85rem; color: var(--color-muted); }
+        #best-score { font-size: 0.9rem; color: var(--color-muted); min-height: 1.4em; }
+        #settings { display: flex; flex-direction: column; gap: 0.75rem; margin: 1rem 0; width: 240px; }
+        .setting-row { display: flex; flex-direction: column; gap: 0.25rem; }
+        .setting-header { display: flex; justify-content: space-between; font-size: 0.9rem; }
+        .setting-value { font-variant-numeric: tabular-nums; }
+        input[type="range"] {
+            -webkit-appearance: none; appearance: none; width: 100%; height: 6px;
+            background: var(--color-muted); border-radius: 3px; outline: none; cursor: pointer;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none; width: 16px; height: 16px;
+            background: var(--color-fg); border-radius: 50%; cursor: pointer;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 16px; height: 16px; background: var(--color-fg); border: none; border-radius: 50%; cursor: pointer;
+        }
+        .setting-ticks { display: flex; justify-content: space-between; padding: 0 7px; margin-top: 2px; }
+        .setting-ticks span { width: 1px; height: 6px; background: var(--color-muted); }
+        #settings.hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <p id="info">Zoom : ×1.0</p>
+        <svg id="game-svg" xmlns="http://www.w3.org/2000/svg">
+            <rect class="svg-bg" x="-99999" y="-99999" width="199998" height="199998" />
+            <polygon id="svg-field" class="svg-field" points="" />
+            <polyline id="svg-trail" class="svg-trail" points="" />
+            <circle id="svg-ball" class="svg-ball" r="4" cx="0" cy="0" />
+            <rect id="svg-player" class="svg-player" width="8" height="8" x="0" y="0" />
+        </svg>
+        <div id="overlay">
+            <div id="overlay-text">
+                <p id="game-over-text">Zoo Keeper</p>
+                <p id="final-score"></p>
+                <div id="settings">
+                    <div class="setting-row">
+                        <div class="setting-header">
+                            <span>Vitesse</span>
+                            <span class="setting-value" id="speed-value">Normale</span>
+                        </div>
+                        <input type="range" id="setting-speed" min="0" max="3" step="1" value="1">
+                        <div class="setting-ticks"><span></span><span></span><span></span><span></span></div>
+                    </div>
+                </div>
+                <p id="best-score"></p>
+                <p id="restart-hint">Appuyer sur &laquo;&nbsp;Espace&nbsp;&raquo; pour jouer</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        /* ── Constants ── */
+        var FIELD_W, FIELD_H;
+        var SPEED_MULTS = [0.6, 1, 1.5, 2.2];
+        var SPEED_LABELS = ['Lente', 'Normale', 'Rapide', 'Très rapide'];
+        var BASE_PLAYER_SPEED = 200;
+        var BASE_BALL_SPEED = 160;
+        var BALL_R = 4;
+        var PLAYER_SIZE = 8;
+        var EPS = 0.5;
+        var TRAIL_HIT_DIST = 3;
+
+        /* ── State ── */
+        var field = [];
+        var ball = { x: 0, y: 0, vx: 0, vy: 0 };
+        var player = { x: 0, y: 0 };
+        var playerDir = { x: 0, y: 0 };
+        var playerState = 'safe';
+        var playerEdge = 0;
+        var trail = [];
+        var trailStart = null;
+        var zoom = 1;
+        var initialArea = 0;
+        var gameOver = false;
+        var gameStarted = false;
+        var speedMult = 1;
+        var lastTime = 0;
+        var animId = 0;
+        var keysDown = {};
+
+        /* ── DOM ── */
+        var svgEl = document.getElementById('game-svg');
+        var fieldEl = document.getElementById('svg-field');
+        var trailEl = document.getElementById('svg-trail');
+        var ballEl = document.getElementById('svg-ball');
+        var playerEl = document.getElementById('svg-player');
+        var infoEl = document.getElementById('info');
+        var overlayEl = document.getElementById('overlay');
+        var gameOverTextEl = document.getElementById('game-over-text');
+        var finalScoreEl = document.getElementById('final-score');
+        var bestScoreEl = document.getElementById('best-score');
+        var restartHintEl = document.getElementById('restart-hint');
+        var settingsEl = document.getElementById('settings');
+        var settingSpeedEl = document.getElementById('setting-speed');
+        var speedValueEl = document.getElementById('speed-value');
+
+        /* ── Geometry utilities ── */
+        function dist(a, b) { var dx = b.x - a.x, dy = b.y - a.y; return Math.sqrt(dx * dx + dy * dy); }
+        function len(v) { return Math.sqrt(v.x * v.x + v.y * v.y); }
+        function normalize(v) { var l = len(v); return l < 1e-9 ? { x: 0, y: 0 } : { x: v.x / l, y: v.y / l }; }
+        function dot(a, b) { return a.x * b.x + a.y * b.y; }
+        function cross2(a, b) { return a.x * b.y - a.y * b.x; }
+
+        function polygonArea(verts) {
+            var a = 0, n = verts.length;
+            for (var i = 0; i < n; i++) {
+                var j = (i + 1) % n;
+                a += verts[i].x * verts[j].y - verts[j].x * verts[i].y;
+            }
+            return Math.abs(a) / 2;
+        }
+
+        function pointInPolygon(p, verts) {
+            var inside = false, n = verts.length;
+            for (var i = 0, j = n - 1; i < n; j = i++) {
+                var vi = verts[i], vj = verts[j];
+                if ((vi.y > p.y) !== (vj.y > p.y) &&
+                    p.x < (vj.x - vi.x) * (p.y - vi.y) / (vj.y - vi.y) + vi.x) {
+                    inside = !inside;
+                }
+            }
+            return inside;
+        }
+
+        function segSegIntersection(p1, p2, p3, p4) {
+            var d1 = { x: p2.x - p1.x, y: p2.y - p1.y };
+            var d2 = { x: p4.x - p3.x, y: p4.y - p3.y };
+            var denom = cross2(d1, d2);
+            if (Math.abs(denom) < 1e-12) return null;
+            var d3 = { x: p3.x - p1.x, y: p3.y - p1.y };
+            var t = cross2(d3, d2) / denom;
+            var u = cross2(d3, d1) / denom;
+            if (t < 0 || t > 1 || u < 0 || u > 1) return null;
+            return { x: p1.x + t * d1.x, y: p1.y + t * d1.y, t: t, u: u };
+        }
+
+        function distPointToSeg(p, a, b) {
+            var ab = { x: b.x - a.x, y: b.y - a.y };
+            var ap = { x: p.x - a.x, y: p.y - a.y };
+            var t = dot(ap, ab) / dot(ab, ab);
+            t = Math.max(0, Math.min(1, t));
+            var proj = { x: a.x + t * ab.x, y: a.y + t * ab.y };
+            return dist(p, proj);
+        }
+
+        function isOnSegment(p, a, b) {
+            return distPointToSeg(p, a, b) < EPS;
+        }
+
+        function findEdgeOf(point, verts) {
+            var n = verts.length;
+            for (var i = 0; i < n; i++) {
+                if (isOnSegment(point, verts[i], verts[(i + 1) % n])) return i;
+            }
+            return 0;
+        }
+
+        function inwardNormal(edgeIdx) {
+            var a = field[edgeIdx], b = field[(edgeIdx + 1) % field.length];
+            var d = { x: b.x - a.x, y: b.y - a.y };
+            return normalize({ x: -d.y, y: d.x });
+        }
+
+        function edgeDir(edgeIdx) {
+            var a = field[edgeIdx], b = field[(edgeIdx + 1) % field.length];
+            return normalize({ x: b.x - a.x, y: b.y - a.y });
+        }
+
+        function projectOnBorder(px, py) {
+            var bestDist = Infinity, bestPoint = null, bestEdge = 0;
+            var n = field.length;
+            for (var i = 0; i < n; i++) {
+                var a = field[i], b = field[(i + 1) % n];
+                var ab = { x: b.x - a.x, y: b.y - a.y };
+                var ap = { x: px - a.x, y: py - a.y };
+                var t = dot(ap, ab) / dot(ab, ab);
+                t = Math.max(0, Math.min(1, t));
+                var proj = { x: a.x + t * ab.x, y: a.y + t * ab.y };
+                var d = dist({ x: px, y: py }, proj);
+                if (d < bestDist) { bestDist = d; bestPoint = proj; bestEdge = i; }
+            }
+            return { point: bestPoint, edge: bestEdge, dist: bestDist };
+        }
+
+        /* ── Polygon split ── */
+        function splitPolygon(verts, trailPts) {
+            var A = trailPts[0];
+            var B = trailPts[trailPts.length - 1];
+            var edgeA = findEdgeOf(A, verts);
+            var edgeB = findEdgeOf(B, verts);
+            var n = verts.length;
+
+            var poly1 = [{ x: A.x, y: A.y }];
+            var idx = (edgeA + 1) % n;
+            var safety = 0;
+            while (safety++ < n + 2) {
+                poly1.push({ x: verts[idx].x, y: verts[idx].y });
+                if (idx === edgeB) break;
+                idx = (idx + 1) % n;
+            }
+            poly1.push({ x: B.x, y: B.y });
+            for (var i = trailPts.length - 2; i >= 1; i--) {
+                poly1.push({ x: trailPts[i].x, y: trailPts[i].y });
+            }
+
+            var poly2 = [{ x: B.x, y: B.y }];
+            idx = (edgeB + 1) % n;
+            safety = 0;
+            while (safety++ < n + 2) {
+                poly2.push({ x: verts[idx].x, y: verts[idx].y });
+                if (idx === edgeA) break;
+                idx = (idx + 1) % n;
+            }
+            poly2.push({ x: A.x, y: A.y });
+            for (var i = 1; i < trailPts.length - 1; i++) {
+                poly2.push({ x: trailPts[i].x, y: trailPts[i].y });
+            }
+
+            return [poly1, poly2];
+        }
+
+        function cleanPolygon(verts) {
+            if (verts.length < 3) return verts;
+            var result = [verts[0]];
+            for (var i = 1; i < verts.length; i++) {
+                var prev = result[result.length - 1];
+                if (dist(prev, verts[i]) > 0.01) result.push(verts[i]);
+            }
+            if (result.length > 1 && dist(result[0], result[result.length - 1]) < 0.01) result.pop();
+            var cleaned = [];
+            var n = result.length;
+            for (var i = 0; i < n; i++) {
+                var prev = result[(i - 1 + n) % n];
+                var curr = result[i];
+                var next = result[(i + 1) % n];
+                var d1 = normalize({ x: curr.x - prev.x, y: curr.y - prev.y });
+                var d2 = normalize({ x: next.x - curr.x, y: next.y - curr.y });
+                if (Math.abs(cross2(d1, d2)) > 0.001) cleaned.push(curr);
+            }
+            return cleaned.length >= 3 ? cleaned : result;
+        }
+
+        /* ── localStorage ── */
+        function loadBestZoom() {
+            try { return parseFloat(localStorage.getItem('zoo-best-zoom-' + speedMult)) || 1; }
+            catch (e) { return 1; }
+        }
+        function saveBestZoom() {
+            try { localStorage.setItem('zoo-best-zoom-' + speedMult, zoom.toFixed(2)); } catch (e) {}
+        }
+        function loadSettings() {
+            try { return parseInt(localStorage.getItem('zoo-settings-speed') || '1'); }
+            catch (e) { return 1; }
+        }
+        function saveSettings(val) {
+            try { localStorage.setItem('zoo-settings-speed', val); } catch (e) {}
+        }
+
+        /* ── Sizing ── */
+        function resize() {
+            var maxW = window.innerWidth - 32;
+            var maxH = window.innerHeight - 80;
+            var ratio = maxW / maxH;
+            FIELD_W = 500;
+            FIELD_H = Math.round(FIELD_W / ratio);
+            svgEl.setAttribute('width', maxW);
+            svgEl.setAttribute('height', maxH);
+        }
+
+        function initViewBox() {
+            var bbox = boundingBox(field);
+            var pad = 2;
+            svgEl.setAttribute('viewBox',
+                (bbox.x - pad) + ' ' + (bbox.y - pad) + ' ' + (bbox.w + pad * 2) + ' ' + (bbox.h + pad * 2));
+        }
+
+        function boundingBox(verts) {
+            var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            for (var i = 0; i < verts.length; i++) {
+                if (verts[i].x < minX) minX = verts[i].x;
+                if (verts[i].y < minY) minY = verts[i].y;
+                if (verts[i].x > maxX) maxX = verts[i].x;
+                if (verts[i].y > maxY) maxY = verts[i].y;
+            }
+            return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+        }
+
+        /* ── Init game ── */
+        function initGame() {
+            resize();
+            field = [
+                { x: 0, y: 0 },
+                { x: FIELD_W, y: 0 },
+                { x: FIELD_W, y: FIELD_H },
+                { x: 0, y: FIELD_H }
+            ];
+            initialArea = polygonArea(field);
+
+            player.x = FIELD_W / 2;
+            player.y = 0;
+            playerDir = { x: 0, y: 0 };
+            playerState = 'safe';
+            playerEdge = 0;
+            trail = [];
+            trailStart = null;
+
+            var angle = Math.random() * Math.PI * 2;
+            ball.x = FIELD_W / 2;
+            ball.y = FIELD_H / 2;
+            ball.vx = Math.cos(angle);
+            ball.vy = Math.sin(angle);
+
+            zoom = 1;
+            gameOver = false;
+            gameStarted = false;
+
+            initViewBox();
+            draw();
+            showBestScore();
+        }
+
+        function showBestScore() {
+            var best = loadBestZoom();
+            bestScoreEl.textContent = best > 1 ? 'Meilleur zoom : ×' + best.toFixed(1) : '';
+        }
+
+        /* ── Draw ── */
+        function draw() {
+            fieldEl.setAttribute('points', field.map(function (p) { return p.x + ',' + p.y; }).join(' '));
+
+            if (trail.length > 1) {
+                trailEl.setAttribute('points', trail.map(function (p) { return p.x + ',' + p.y; }).join(' '));
+                trailEl.style.display = '';
+            } else {
+                trailEl.style.display = 'none';
+            }
+
+            ballEl.setAttribute('cx', ball.x);
+            ballEl.setAttribute('cy', ball.y);
+            var bbox = boundingBox(field);
+            var scale = Math.max(bbox.w, bbox.h) / 500;
+            ballEl.setAttribute('r', Math.max(2, BALL_R * scale));
+
+            var ps = Math.max(4, PLAYER_SIZE * scale);
+            playerEl.setAttribute('x', player.x - ps / 2);
+            playerEl.setAttribute('y', player.y - ps / 2);
+            playerEl.setAttribute('width', ps);
+            playerEl.setAttribute('height', ps);
+
+            trailEl.style.strokeWidth = Math.max(1, 2 * scale);
+
+            infoEl.textContent = 'Zoom : ×' + zoom.toFixed(1);
+        }
+
+        /* ── Player movement ── */
+        function getActiveDir() {
+            var dx = 0, dy = 0;
+            if (keysDown['ArrowLeft'] || keysDown['a'] || keysDown['A']) dx -= 1;
+            if (keysDown['ArrowRight'] || keysDown['d'] || keysDown['D']) dx += 1;
+            if (keysDown['ArrowUp'] || keysDown['w'] || keysDown['W']) dy -= 1;
+            if (keysDown['ArrowDown'] || keysDown['s'] || keysDown['S']) dy += 1;
+            if (dx !== 0 && dy !== 0) dy = 0;
+            return { x: dx, y: dy };
+        }
+
+        function movePlayerSafe(dt) {
+            var dir = getActiveDir();
+            if (dir.x === 0 && dir.y === 0) return;
+
+            var speed = BASE_PLAYER_SPEED * speedMult * dt / Math.sqrt(zoom);
+            var ed = edgeDir(playerEdge);
+            var dotVal = dot(dir, ed);
+
+            if (Math.abs(dotVal) > 0.5) {
+                var amount = speed * (dotVal > 0 ? 1 : -1);
+                var a = field[playerEdge], b = field[(playerEdge + 1) % field.length];
+                var edgeLen = dist(a, b);
+                var currentT = 0;
+                if (edgeLen > 0.01) {
+                    var ap = { x: player.x - a.x, y: player.y - a.y };
+                    currentT = dot(ap, { x: b.x - a.x, y: b.y - a.y }) / (edgeLen * edgeLen);
+                }
+                var newT = currentT + amount / edgeLen;
+
+                if (newT > 1) {
+                    playerEdge = (playerEdge + 1) % field.length;
+                    var na = field[playerEdge], nb = field[(playerEdge + 1) % field.length];
+                    player.x = na.x; player.y = na.y;
+                } else if (newT < 0) {
+                    playerEdge = (playerEdge - 1 + field.length) % field.length;
+                    var na = field[playerEdge], nb = field[(playerEdge + 1) % field.length];
+                    player.x = nb.x; player.y = nb.y;
+                } else {
+                    player.x = a.x + (b.x - a.x) * newT;
+                    player.y = a.y + (b.y - a.y) * newT;
+                }
+            } else {
+                var inN = inwardNormal(playerEdge);
+                var inDot = dot(dir, inN);
+                if (inDot > 0.5) {
+                    playerState = 'draw';
+                    trailStart = { x: player.x, y: player.y };
+                    trail = [{ x: player.x, y: player.y }];
+                    playerDir = { x: dir.x, y: dir.y };
+                    player.x += dir.x * speed;
+                    player.y += dir.y * speed;
+                    trail.push({ x: player.x, y: player.y });
+                }
+            }
+        }
+
+        function movePlayerDraw(dt) {
+            var dir = getActiveDir();
+            if (dir.x !== 0 || dir.y !== 0) {
+                if (dir.x !== -playerDir.x || dir.y !== -playerDir.y) {
+                    playerDir = { x: dir.x, y: dir.y };
+                }
+            }
+            if (playerDir.x === 0 && playerDir.y === 0) return;
+
+            var speed = BASE_PLAYER_SPEED * speedMult * dt / Math.sqrt(zoom);
+            var nx = player.x + playerDir.x * speed;
+            var ny = player.y + playerDir.y * speed;
+
+            var n = field.length;
+            var bestHit = null;
+            var bestT = Infinity;
+
+            for (var i = 0; i < n; i++) {
+                var a = field[i], b = field[(i + 1) % n];
+                var hit = segSegIntersection(player, { x: nx, y: ny }, a, b);
+                if (hit && hit.t > 0.001 && hit.t < bestT) {
+                    bestT = hit.t;
+                    bestHit = { x: hit.x, y: hit.y, edge: i };
+                }
+            }
+
+            if (bestHit && bestT <= 1) {
+                trail.push({ x: bestHit.x, y: bestHit.y });
+                player.x = bestHit.x;
+                player.y = bestHit.y;
+                playerEdge = bestHit.edge;
+                playerState = 'safe';
+                playerDir = { x: 0, y: 0 };
+                captureArea();
+            } else {
+                player.x = nx;
+                player.y = ny;
+                trail.push({ x: nx, y: ny });
+
+                if (!pointInPolygon({ x: nx, y: ny }, field)) {
+                    var proj = projectOnBorder(nx, ny);
+                    player.x = proj.point.x;
+                    player.y = proj.point.y;
+                    playerEdge = proj.edge;
+                    trail[trail.length - 1] = { x: player.x, y: player.y };
+                    playerState = 'safe';
+                    playerDir = { x: 0, y: 0 };
+                    captureArea();
+                }
+            }
+        }
+
+        /* ── Ball movement ── */
+        function moveBall(dt) {
+            var speed = BASE_BALL_SPEED * speedMult * dt / Math.sqrt(zoom);
+            var nx = ball.x + ball.vx * speed;
+            var ny = ball.y + ball.vy * speed;
+            var n = field.length;
+            var bounced = false;
+
+            for (var iter = 0; iter < 3; iter++) {
+                var bestHit = null;
+                var bestT = Infinity;
+
+                for (var i = 0; i < n; i++) {
+                    var a = field[i], b = field[(i + 1) % n];
+                    var hit = segSegIntersection({ x: ball.x, y: ball.y }, { x: nx, y: ny }, a, b);
+                    if (hit && hit.t > 0.001 && hit.t < bestT) {
+                        bestT = hit.t;
+                        var edgeD = { x: b.x - a.x, y: b.y - a.y };
+                        var norm = normalize({ x: -edgeD.y, y: edgeD.x });
+                        bestHit = { x: hit.x, y: hit.y, norm: norm };
+                    }
+                }
+
+                if (bestHit && bestT <= 1) {
+                    var d = dot({ x: ball.vx, y: ball.vy }, bestHit.norm);
+                    ball.vx -= 2 * d * bestHit.norm.x;
+                    ball.vy -= 2 * d * bestHit.norm.y;
+                    ball.x = bestHit.x + bestHit.norm.x * 0.5;
+                    ball.y = bestHit.y + bestHit.norm.y * 0.5;
+                    var remaining = speed * (1 - bestT);
+                    nx = ball.x + ball.vx * remaining;
+                    ny = ball.y + ball.vy * remaining;
+                    bounced = true;
+                } else {
+                    ball.x = nx;
+                    ball.y = ny;
+                    break;
+                }
+            }
+
+            if (!pointInPolygon(ball, field)) {
+                var proj = projectOnBorder(ball.x, ball.y);
+                var norm = inwardNormal(proj.edge);
+                ball.x = proj.point.x + norm.x * 2;
+                ball.y = proj.point.y + norm.y * 2;
+            }
+        }
+
+        function checkBallTrailHit() {
+            if (trail.length < 2) return false;
+            for (var i = 0; i < trail.length - 1; i++) {
+                var d = distPointToSeg(ball, trail[i], trail[i + 1]);
+                if (d < TRAIL_HIT_DIST * (1 / Math.sqrt(zoom))) return true;
+            }
+            return false;
+        }
+
+        /* ── Capture & Zoom ── */
+        function captureArea() {
+            if (trail.length < 2) { trail = []; return; }
+
+            var oldArea = polygonArea(field);
+            var result = splitPolygon(field, trail);
+            var poly1 = cleanPolygon(result[0]);
+            var poly2 = cleanPolygon(result[1]);
+
+            if (poly1.length < 3 || poly2.length < 3) {
+                trail = [];
+                return;
+            }
+
+            var ballIn1 = pointInPolygon(ball, poly1);
+            var ballIn2 = pointInPolygon(ball, poly2);
+
+            if (ballIn1) {
+                field = poly1;
+            } else if (ballIn2) {
+                field = poly2;
+            } else {
+                var a1 = polygonArea(poly1), a2 = polygonArea(poly2);
+                field = a1 > a2 ? poly1 : poly2;
+            }
+
+            trail = [];
+            var newArea = polygonArea(field);
+            if (newArea > 0 && newArea < oldArea) {
+                zoom *= oldArea / newArea;
+            }
+
+            if (zoom > loadBestZoom()) saveBestZoom();
+            applyZoom();
+        }
+
+        function applyZoom() {
+            initViewBox();
+            playerEdge = findEdgeOf(player, field);
+        }
+
+        /* ── Game tick ── */
+        function tick(timestamp) {
+            if (gameOver) return;
+            var dt = Math.min((timestamp - lastTime) / 1000, 0.05);
+            lastTime = timestamp;
+
+            if (playerState === 'safe') {
+                movePlayerSafe(dt);
+            } else {
+                movePlayerDraw(dt);
+            }
+
+            moveBall(dt);
+
+            if (playerState === 'draw' && checkBallTrailHit()) {
+                endGame();
+                return;
+            }
+
+            draw();
+            animId = requestAnimationFrame(tick);
+        }
+
+        /* ── Game lifecycle ── */
+        function startGame() {
+            readSettings();
+            gameStarted = true;
+            settingsEl.classList.add('hidden');
+            overlayEl.classList.add('hidden');
+            lastTime = performance.now();
+            animId = requestAnimationFrame(tick);
+        }
+
+        function endGame() {
+            gameOver = true;
+            cancelAnimationFrame(animId);
+            if (zoom > loadBestZoom()) saveBestZoom();
+            gameOverTextEl.textContent = 'Game Over';
+            finalScoreEl.textContent = 'Zoom atteint : ×' + zoom.toFixed(1);
+            var best = loadBestZoom();
+            bestScoreEl.textContent = 'Meilleur : ×' + best.toFixed(1);
+            restartHintEl.textContent = 'Appuyer sur \u00ab\u00a0Espace\u00a0\u00bb pour recommencer';
+            overlayEl.classList.remove('hidden');
+        }
+
+        function restartGame() {
+            cancelAnimationFrame(animId);
+            gameOverTextEl.textContent = 'Zoo Keeper';
+            finalScoreEl.textContent = '';
+            settingsEl.classList.remove('hidden');
+            restartHintEl.textContent = 'Appuyer sur \u00ab\u00a0Espace\u00a0\u00bb pour jouer';
+            initGame();
+            overlayEl.classList.remove('hidden');
+        }
+
+        /* ── Settings ── */
+        function readSettings() {
+            var si = parseInt(settingSpeedEl.value, 10);
+            speedMult = SPEED_MULTS[si];
+        }
+        function updateSettingLabels() {
+            speedValueEl.textContent = SPEED_LABELS[parseInt(settingSpeedEl.value, 10)];
+        }
+        settingSpeedEl.addEventListener('input', function () {
+            saveSettings(this.value);
+            updateSettingLabels();
+            readSettings();
+            showBestScore();
+            initGame();
+        });
+
+        /* ── Controls ── */
+        document.addEventListener('keydown', function (e) {
+            keysDown[e.key] = true;
+            if (e.key === ' ') {
+                if (gameOver) restartGame();
+                else if (!gameStarted) startGame();
+                e.preventDefault();
+            }
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].indexOf(e.key) !== -1) {
+                e.preventDefault();
+            }
+        });
+        document.addEventListener('keyup', function (e) {
+            keysDown[e.key] = false;
+        });
+
+        /* ── Touch controls ── */
+        var touchStartX, touchStartY;
+        var MIN_SWIPE = 30;
+
+        svgEl.addEventListener('touchstart', function (e) {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+            e.preventDefault();
+        }, { passive: false });
+
+        svgEl.addEventListener('touchend', function (e) {
+            if (touchStartX === undefined) return;
+            var dx = e.changedTouches[0].clientX - touchStartX;
+            var dy = e.changedTouches[0].clientY - touchStartY;
+            touchStartX = undefined;
+
+            if (Math.abs(dx) < MIN_SWIPE && Math.abs(dy) < MIN_SWIPE) {
+                if (gameOver) restartGame();
+                else if (!gameStarted) startGame();
+                return;
+            }
+
+            if (Math.abs(dx) > Math.abs(dy)) {
+                keysDown = {};
+                keysDown[dx > 0 ? 'ArrowRight' : 'ArrowLeft'] = true;
+                setTimeout(function () { keysDown = {}; }, 150);
+            } else {
+                keysDown = {};
+                keysDown[dy > 0 ? 'ArrowDown' : 'ArrowUp'] = true;
+                setTimeout(function () { keysDown = {}; }, 150);
+            }
+            e.preventDefault();
+        }, { passive: false });
+
+        /* ── Resize ── */
+        window.addEventListener('resize', function () {
+            resize();
+            if (!gameStarted) initGame();
+            else initViewBox();
+        });
+
+        /* ── Init ── */
+        var savedSpeed = loadSettings();
+        settingSpeedEl.value = savedSpeed;
+        updateSettingLabels();
+        readSettings();
+        initGame();
+    })();
+    </script>
+</body>
+</html>
