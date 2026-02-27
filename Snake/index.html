@@ -89,35 +89,74 @@
         #best-score {
             font-size: 0.9rem;
             color: var(--color-muted);
+            min-height: 1.4em;
         }
 
         #settings {
             display: flex;
-            gap: 1.5rem;
+            flex-direction: column;
+            gap: 0.75rem;
             margin: 1rem 0;
+            width: 240px;
         }
 
-        #settings label {
-            font-size: 0.9rem;
+        .setting-row {
             display: flex;
-            align-items: center;
-            gap: 0.4rem;
+            flex-direction: column;
+            gap: 0.25rem;
         }
 
-        #settings select {
-            font-family: inherit;
-            font-size: 0.85rem;
-            padding: 0.25rem 0.4rem;
-            background: transparent;
-            color: inherit;
-            border: 1px solid var(--color-fg);
-            border-radius: 4px;
+        .setting-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+        }
+
+        .setting-value {
+            font-variant-numeric: tabular-nums;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 6px;
+            background: var(--color-muted);
+            border-radius: 3px;
+            outline: none;
             cursor: pointer;
         }
 
-        #settings select option {
-            background: var(--color-bg);
-            color: var(--color-fg);
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--color-fg);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: var(--color-fg);
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .setting-ticks {
+            display: flex;
+            justify-content: space-between;
+            padding: 0 7px;
+            margin-top: 2px;
+        }
+
+        .setting-ticks span {
+            width: 1px;
+            height: 6px;
+            background: var(--color-muted);
         }
 
         #settings.hidden {
@@ -134,25 +173,22 @@
                 <p id="game-over-text">Snake</p>
                 <p id="final-score"></p>
                 <div id="settings">
-                    <label>
-                        Grille :
-                        <select id="setting-grid">
-                            <option value="10">10 &times; 10</option>
-                            <option value="15">15 &times; 15</option>
-                            <option value="20" selected>20 &times; 20</option>
-                            <option value="25">25 &times; 25</option>
-                            <option value="30">30 &times; 30</option>
-                        </select>
-                    </label>
-                    <label>
-                        Vitesse :
-                        <select id="setting-speed">
-                            <option value="220">Lente</option>
-                            <option value="180" selected>Normale</option>
-                            <option value="120">Rapide</option>
-                            <option value="80">Tr&egrave;s rapide</option>
-                        </select>
-                    </label>
+                    <div class="setting-row">
+                        <div class="setting-header">
+                            <span>Grille</span>
+                            <span class="setting-value" id="grid-value">20 &times; 20</span>
+                        </div>
+                        <input type="range" id="setting-grid" min="0" max="4" step="1" value="2">
+                        <div class="setting-ticks"><span></span><span></span><span></span><span></span><span></span></div>
+                    </div>
+                    <div class="setting-row">
+                        <div class="setting-header">
+                            <span>Vitesse</span>
+                            <span class="setting-value" id="speed-value">Normale</span>
+                        </div>
+                        <input type="range" id="setting-speed" min="0" max="3" step="1" value="1">
+                        <div class="setting-ticks"><span></span><span></span><span></span><span></span></div>
+                    </div>
                 </div>
                 <p id="best-score"></p>
                 <p id="restart-hint">Appuyer sur Espace pour jouer</p>
@@ -352,19 +388,35 @@
                 draw();
             }
 
-            // Read settings from selects
+            // Settings mappings
+            var GRID_VALUES = [10, 15, 20, 25, 30];
+            var SPEED_VALUES = [220, 180, 120, 80];
+            var SPEED_LABELS = ['Lente', 'Normale', 'Rapide', 'Tr\u00e8s rapide'];
+            var gridValueEl = document.getElementById('grid-value');
+            var speedValueEl = document.getElementById('speed-value');
+
             function readSettings() {
-                GRID = parseInt(settingGridEl.value, 10);
-                TICK_MS = parseInt(settingSpeedEl.value, 10);
+                var gi = parseInt(settingGridEl.value, 10);
+                var si = parseInt(settingSpeedEl.value, 10);
+                GRID = GRID_VALUES[gi];
+                TICK_MS = SPEED_VALUES[si];
             }
 
-            // Update best score when settings change
-            settingGridEl.addEventListener('change', function () {
+            function updateSettingLabels() {
+                var gi = parseInt(settingGridEl.value, 10);
+                var si = parseInt(settingSpeedEl.value, 10);
+                gridValueEl.textContent = GRID_VALUES[gi] + ' \u00d7 ' + GRID_VALUES[gi];
+                speedValueEl.textContent = SPEED_LABELS[si];
+            }
+
+            settingGridEl.addEventListener('input', function () {
+                updateSettingLabels();
                 readSettings();
                 showBestScore();
                 initGame();
             });
-            settingSpeedEl.addEventListener('change', function () {
+            settingSpeedEl.addEventListener('input', function () {
+                updateSettingLabels();
                 readSettings();
                 showBestScore();
                 initGame();
