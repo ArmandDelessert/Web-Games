@@ -254,6 +254,18 @@
                 localStorage.setItem('snake-highscores', JSON.stringify(others.concat(thisConfig)));
             }
 
+            function saveSettings(grid, speed) {
+                localStorage.setItem('snake-settings-grid', grid);
+                localStorage.setItem('snake-settings-speed', speed);
+            }
+
+            function loadSettings() {
+                return {
+                    grid: parseInt(localStorage.getItem('snake-settings-grid') || '2'),
+                    speed: parseInt(localStorage.getItem('snake-settings-speed') || '1')
+                };
+            }
+
             function getBestScore(grid, speed) {
                 var scores = loadHighScores();
                 var best = 0;
@@ -412,12 +424,14 @@
             }
 
             settingGridEl.addEventListener('input', function () {
+                saveSettings(this.value, settingSpeedEl.value);
                 updateSettingLabels();
                 readSettings();
                 showBestScore();
                 initGame();
             });
             settingSpeedEl.addEventListener('input', function () {
+                saveSettings(settingGridEl.value, this.value);
                 updateSettingLabels();
                 readSettings();
                 showBestScore();
@@ -537,6 +551,13 @@
             }, { passive: false });
 
             // Init
+            // Restaurer les paramètres sauvegardés
+            var savedSettings = loadSettings();
+            settingGridEl.value = savedSettings.grid;
+            settingSpeedEl.value = savedSettings.speed;
+            updateSettingLabels();
+            readSettings();
+
             showBestScore();
             resize();
             initGame();
