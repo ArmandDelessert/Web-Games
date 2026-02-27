@@ -85,6 +85,44 @@
             font-size: 0.85rem;
             color: var(--color-muted);
         }
+
+        #best-score {
+            font-size: 0.9rem;
+            color: var(--color-muted);
+        }
+
+        #settings {
+            display: flex;
+            gap: 1.5rem;
+            margin: 1rem 0;
+        }
+
+        #settings label {
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        #settings select {
+            font-family: inherit;
+            font-size: 0.85rem;
+            padding: 0.25rem 0.4rem;
+            background: transparent;
+            color: inherit;
+            border: 1px solid var(--color-fg);
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        #settings select option {
+            background: var(--color-bg);
+            color: var(--color-fg);
+        }
+
+        #settings.hidden {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -95,6 +133,28 @@
             <div id="overlay-text">
                 <p id="game-over-text">Snake</p>
                 <p id="final-score"></p>
+                <div id="settings">
+                    <label>
+                        Grille :
+                        <select id="setting-grid">
+                            <option value="10">10 &times; 10</option>
+                            <option value="15">15 &times; 15</option>
+                            <option value="20" selected>20 &times; 20</option>
+                            <option value="25">25 &times; 25</option>
+                            <option value="30">30 &times; 30</option>
+                        </select>
+                    </label>
+                    <label>
+                        Vitesse :
+                        <select id="setting-speed">
+                            <option value="220">Lente</option>
+                            <option value="180" selected>Normale</option>
+                            <option value="120">Rapide</option>
+                            <option value="80">Tr&egrave;s rapide</option>
+                        </select>
+                    </label>
+                </div>
+                <p id="best-score"></p>
                 <p id="restart-hint">Appuyer sur Espace pour jouer</p>
             </div>
         </div>
@@ -110,6 +170,17 @@
 
             var snake, direction, nextDirection, food, score, gameOver, gameStarted, interval;
 
+            // DOM elements
+            var scoreEl = document.getElementById('score');
+            var overlayEl = document.getElementById('overlay');
+            var gameOverTextEl = document.getElementById('game-over-text');
+            var finalScoreEl = document.getElementById('final-score');
+            var settingsEl = document.getElementById('settings');
+            var bestScoreEl = document.getElementById('best-score');
+            var restartHintEl = document.getElementById('restart-hint');
+            var settingGridEl = document.getElementById('setting-grid');
+            var settingSpeedEl = document.getElementById('setting-speed');
+
             // Theme
             var colorBg, colorFg;
             var darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -121,6 +192,45 @@
 
             darkQuery.addEventListener('change', updateColors);
             updateColors();
+
+            // High scores (localStorage)
+            function loadHighScores() {
+                try {
+                    return JSON.parse(localStorage.getItem('snake-highscores')) || [];
+                } catch (e) {
+                    return [];
+                }
+            }
+
+            function saveHighScore(newScore, grid, speed) {
+                var scores = loadHighScores();
+                scores.push({
+                    score: newScore,
+                    grid: grid,
+                    speed: speed,
+                    date: new Date().toISOString().slice(0, 10)
+                });
+                scores.sort(function (a, b) { return b.score - a.score; });
+                scores = scores.slice(0, 10);
+                localStorage.setItem('snake-highscores', JSON.stringify(scores));
+                return scores;
+            }
+
+            function getBestScore(grid, speed) {
+                var scores = loadHighScores();
+                var best = 0;
+                for (var i = 0; i < scores.length; i++) {
+                    if (scores[i].grid === grid && scores[i].speed === speed && scores[i].score > best) {
+                        best = scores[i].score;
+                    }
+                }
+                return best;
+            }
+
+            function showBestScore() {
+                var best = getBestScore(GRID, TICK_MS);
+                bestScoreEl.textContent = best > 0 ? 'Meilleur score : ' + best : '';
+            }
 
             // Sizing
             function resize() {
@@ -151,16 +261,45 @@
                     cellSize - 2
                 );
 
-                // Snake
-                for (var i = 0; i < snake.length; i++) {
-                    var gap = i === 0 ? 0 : 1;
+                // Snake body
+                for (var i = 1; i < snake.length; i++) {
                     ctx.fillRect(
-                        snake[i].x * cellSize + gap,
-                        snake[i].y * cellSize + gap,
-                        cellSize - gap * 2,
-                        cellSize - gap * 2
+                        snake[i].x * cellSize + 1,
+                        snake[i].y * cellSize + 1,
+                        cellSize - 2,
+                        cellSize - 2
                     );
                 }
+
+                // Snake head (full cell, no gap)
+                var hx = snake[0].x * cellSize;
+                var hy = snake[0].y * cellSize;
+                var cs = cellSize;
+                ctx.fillRect(hx, hy, cs, cs);
+
+                // Direction notch on head
+                ctx.fillStyle = colorBg;
+                ctx.beginPath();
+                var notch = Math.floor(cs * 0.35);
+
+                if (direction.x === 1) {
+                    ctx.moveTo(hx, hy);
+                    ctx.lineTo(hx + notch, hy + cs / 2);
+                    ctx.lineTo(hx, hy + cs);
+                } else if (direction.x === -1) {
+                    ctx.moveTo(hx + cs, hy);
+                    ctx.lineTo(hx + cs - notch, hy + cs / 2);
+                    ctx.lineTo(hx + cs, hy + cs);
+                } else if (direction.y === -1) {
+                    ctx.moveTo(hx, hy + cs);
+                    ctx.lineTo(hx + cs / 2, hy + cs - notch);
+                    ctx.lineTo(hx + cs, hy + cs);
+                } else if (direction.y === 1) {
+                    ctx.moveTo(hx, hy);
+                    ctx.lineTo(hx + cs / 2, hy + notch);
+                    ctx.lineTo(hx + cs, hy);
+                }
+                ctx.fill();
             }
 
             // Food spawn
@@ -204,7 +343,7 @@
 
                 if (head.x === food.x && head.y === food.y) {
                     score++;
-                    document.getElementById('score').textContent = 'Score : ' + score;
+                    scoreEl.textContent = 'Score : ' + score;
                     spawnFood();
                 } else {
                     snake.pop();
@@ -213,37 +352,77 @@
                 draw();
             }
 
+            // Read settings from selects
+            function readSettings() {
+                GRID = parseInt(settingGridEl.value, 10);
+                TICK_MS = parseInt(settingSpeedEl.value, 10);
+            }
+
+            // Update best score when settings change
+            settingGridEl.addEventListener('change', function () {
+                readSettings();
+                showBestScore();
+                initGame();
+            });
+            settingSpeedEl.addEventListener('change', function () {
+                readSettings();
+                showBestScore();
+                initGame();
+            });
+
             // Game lifecycle
             function initGame() {
-                snake = [{ x: 10, y: 10 }];
+                var center = Math.floor(GRID / 2);
+                snake = [{ x: center, y: center }];
                 direction = { x: 1, y: 0 };
                 nextDirection = { x: 1, y: 0 };
                 score = 0;
                 gameOver = false;
                 gameStarted = false;
-                document.getElementById('score').textContent = 'Score : 0';
+                scoreEl.textContent = 'Score : 0';
                 spawnFood();
+                resize();
                 draw();
             }
 
             function startGame() {
+                readSettings();
                 gameStarted = true;
-                document.getElementById('overlay').classList.add('hidden');
+                settingsEl.classList.add('hidden');
+                overlayEl.classList.add('hidden');
+                resize();
                 interval = setInterval(tick, TICK_MS);
             }
 
             function endGame() {
                 gameOver = true;
                 clearInterval(interval);
-                document.getElementById('game-over-text').textContent = 'Game Over';
-                document.getElementById('final-score').textContent = 'Score : ' + score;
-                document.getElementById('restart-hint').textContent = 'Appuyer sur Espace pour recommencer';
-                document.getElementById('overlay').classList.remove('hidden');
+
+                var best = getBestScore(GRID, TICK_MS);
+                var isNewRecord = score > best;
+                saveHighScore(score, GRID, TICK_MS);
+
+                gameOverTextEl.textContent = 'Game Over';
+                finalScoreEl.textContent = 'Score : ' + score;
+
+                if (isNewRecord && score > 0) {
+                    bestScoreEl.textContent = 'Nouveau record !';
+                } else {
+                    bestScoreEl.textContent = 'Meilleur : ' + Math.max(best, score);
+                }
+
+                restartHintEl.textContent = 'Appuyer sur Espace pour recommencer';
+                overlayEl.classList.remove('hidden');
             }
 
             function restartGame() {
+                gameOverTextEl.textContent = 'Snake';
+                finalScoreEl.textContent = '';
+                settingsEl.classList.remove('hidden');
+                showBestScore();
+                restartHintEl.textContent = 'Appuyer sur Espace pour jouer';
                 initGame();
-                startGame();
+                overlayEl.classList.remove('hidden');
             }
 
             // Keyboard controls
@@ -304,6 +483,7 @@
             }, { passive: false });
 
             // Init
+            showBestScore();
             resize();
             initGame();
         })();
