@@ -191,7 +191,7 @@
                     </div>
                 </div>
                 <p id="best-score"></p>
-                <p id="restart-hint">Appuyer sur Espace pour jouer</p>
+                <p id="restart-hint">Appuyer sur &laquo;&nbsp;Espace&nbsp;&raquo; pour jouer</p>
             </div>
         </div>
     </div>
@@ -239,17 +239,19 @@
             }
 
             function saveHighScore(newScore, grid, speed) {
-                var scores = loadHighScores();
-                scores.push({
+                var all = loadHighScores();
+                all.push({
                     score: newScore,
                     grid: grid,
                     speed: speed,
                     date: new Date().toISOString().slice(0, 10)
                 });
-                scores.sort(function (a, b) { return b.score - a.score; });
-                scores = scores.slice(0, 10);
-                localStorage.setItem('snake-highscores', JSON.stringify(scores));
-                return scores;
+                // Keep top 20 per grid/speed config
+                var thisConfig = all.filter(function (s) { return s.grid === grid && s.speed === speed; });
+                thisConfig.sort(function (a, b) { return b.score - a.score; });
+                thisConfig = thisConfig.slice(0, 20);
+                var others = all.filter(function (s) { return s.grid !== grid || s.speed !== speed; });
+                localStorage.setItem('snake-highscores', JSON.stringify(others.concat(thisConfig)));
             }
 
             function getBestScore(grid, speed) {
@@ -463,7 +465,7 @@
                     bestScoreEl.textContent = 'Meilleur : ' + Math.max(best, score);
                 }
 
-                restartHintEl.textContent = 'Appuyer sur Espace pour recommencer';
+                restartHintEl.textContent = 'Appuyer sur \u00ab\u00a0Espace\u00a0\u00bb pour recommencer';
                 overlayEl.classList.remove('hidden');
             }
 
@@ -472,7 +474,7 @@
                 finalScoreEl.textContent = '';
                 settingsEl.classList.remove('hidden');
                 showBestScore();
-                restartHintEl.textContent = 'Appuyer sur Espace pour jouer';
+                restartHintEl.textContent = 'Appuyer sur \u00ab\u00a0Espace\u00a0\u00bb pour jouer';
                 initGame();
                 overlayEl.classList.remove('hidden');
             }
