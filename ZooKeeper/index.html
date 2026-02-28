@@ -200,7 +200,12 @@
             for (var i = 0; i < n; i++) {
                 if (isOnSegment(point, verts[i], verts[(i + 1) % n])) return i;
             }
-            return 0;
+            var bestDist = Infinity, bestEdge = 0;
+            for (var i = 0; i < n; i++) {
+                var d = distPointToSeg(point, verts[i], verts[(i + 1) % n]);
+                if (d < bestDist) { bestDist = d; bestEdge = i; }
+            }
+            return bestEdge;
         }
 
         function inwardNormal(edgeIdx) {
@@ -214,11 +219,11 @@
             return normalize({ x: b.x - a.x, y: b.y - a.y });
         }
 
-        function projectOnBorder(px, py) {
+        function projectOnBorderOf(px, py, verts) {
             var bestDist = Infinity, bestPoint = null, bestEdge = 0;
-            var n = field.length;
+            var n = verts.length;
             for (var i = 0; i < n; i++) {
-                var a = field[i], b = field[(i + 1) % n];
+                var a = verts[i], b = verts[(i + 1) % n];
                 var ab = { x: b.x - a.x, y: b.y - a.y };
                 var ap = { x: px - a.x, y: py - a.y };
                 var t = dot(ap, ab) / dot(ab, ab);
@@ -230,14 +235,60 @@
             return { point: bestPoint, edge: bestEdge, dist: bestDist };
         }
 
+        function projectOnBorder(px, py) {
+            return projectOnBorderOf(px, py, field);
+        }
+
         /* ── Polygon split ── */
         function splitPolygon(verts, trailPts) {
             var A = trailPts[0];
             var B = trailPts[trailPts.length - 1];
-            var edgeA = findEdgeOf(A, verts);
-            var edgeB = findEdgeOf(B, verts);
+
+            var projA = projectOnBorderOf(A.x, A.y, verts);
+            var projB = projectOnBorderOf(B.x, B.y, verts);
+            A = { x: projA.point.x, y: projA.point.y };
+            B = { x: projB.point.x, y: projB.point.y };
+            var edgeA = projA.edge;
+            var edgeB = projB.edge;
             var n = verts.length;
 
+            /* Cas spécial : A et B sur la même arête */
+            if (edgeA === edgeB) {
+                var va = verts[edgeA], vb = verts[(edgeA + 1) % n];
+                var edgeVec = { x: vb.x - va.x, y: vb.y - va.y };
+                var tA = dot({ x: A.x - va.x, y: A.y - va.y }, edgeVec);
+                var tB = dot({ x: B.x - va.x, y: B.y - va.y }, edgeVec);
+
+                var small = trailPts.map(function (p) { return { x: p.x, y: p.y }; });
+                var large = [];
+
+                if (tA < tB) {
+                    large.push({ x: B.x, y: B.y });
+                    var idx = (edgeA + 1) % n;
+                    for (var s = 0; s < n; s++) {
+                        large.push({ x: verts[idx].x, y: verts[idx].y });
+                        idx = (idx + 1) % n;
+                    }
+                    large.push({ x: A.x, y: A.y });
+                    for (var i = 1; i < trailPts.length - 1; i++) {
+                        large.push({ x: trailPts[i].x, y: trailPts[i].y });
+                    }
+                } else {
+                    large.push({ x: A.x, y: A.y });
+                    var idx = (edgeA + 1) % n;
+                    for (var s = 0; s < n; s++) {
+                        large.push({ x: verts[idx].x, y: verts[idx].y });
+                        idx = (idx + 1) % n;
+                    }
+                    large.push({ x: B.x, y: B.y });
+                    for (var i = trailPts.length - 2; i >= 1; i--) {
+                        large.push({ x: trailPts[i].x, y: trailPts[i].y });
+                    }
+                }
+                return [small, large];
+            }
+
+            /* Cas normal : edgeA ≠ edgeB */
             var poly1 = [{ x: A.x, y: A.y }];
             var idx = (edgeA + 1) % n;
             var safety = 0;
@@ -283,7 +334,7 @@
                 var next = result[(i + 1) % n];
                 var d1 = normalize({ x: curr.x - prev.x, y: curr.y - prev.y });
                 var d2 = normalize({ x: next.x - curr.x, y: next.y - curr.y });
-                if (Math.abs(cross2(d1, d2)) > 0.001) cleaned.push(curr);
+                if (Math.abs(cross2(d1, d2)) > 0.01) cleaned.push(curr);
             }
             return cleaned.length >= 3 ? cleaned : result;
         }
@@ -387,15 +438,15 @@
             ballEl.setAttribute('cy', ball.y);
             var bbox = boundingBox(field);
             var scale = Math.max(bbox.w, bbox.h) / 500;
-            ballEl.setAttribute('r', Math.max(2, BALL_R * scale));
+            ballEl.setAttribute('r', BALL_R * scale);
 
-            var ps = Math.max(4, PLAYER_SIZE * scale);
+            var ps = PLAYER_SIZE * scale;
             playerEl.setAttribute('x', player.x - ps / 2);
             playerEl.setAttribute('y', player.y - ps / 2);
             playerEl.setAttribute('width', ps);
             playerEl.setAttribute('height', ps);
 
-            trailEl.style.strokeWidth = Math.max(1, 2 * scale);
+            trailEl.style.strokeWidth = 2 * scale;
 
             infoEl.textContent = 'Zoom : ×' + zoom.toFixed(1);
         }
@@ -604,7 +655,10 @@
 
         function applyZoom() {
             initViewBox();
-            playerEdge = findEdgeOf(player, field);
+            var proj = projectOnBorder(player.x, player.y);
+            player.x = proj.point.x;
+            player.y = proj.point.y;
+            playerEdge = proj.edge;
         }
 
         /* ── Game tick ── */
