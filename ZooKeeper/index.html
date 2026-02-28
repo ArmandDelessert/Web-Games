@@ -368,7 +368,7 @@
 
         function initViewBox() {
             var bbox = boundingBox(field);
-            var pad = 2;
+            var pad = Math.max(bbox.w, bbox.h) * 0.005;
             svgEl.setAttribute('viewBox',
                 (bbox.x - pad) + ' ' + (bbox.y - pad) + ' ' + (bbox.w + pad * 2) + ' ' + (bbox.h + pad * 2));
         }
@@ -466,7 +466,7 @@
             var dir = getActiveDir();
             if (dir.x === 0 && dir.y === 0) return;
 
-            var speed = BASE_PLAYER_SPEED * speedMult * dt / Math.sqrt(zoom);
+            var speed = BASE_PLAYER_SPEED * speedMult * dt;
             var ed = edgeDir(playerEdge);
             var dotVal = dot(dir, ed);
 
@@ -517,7 +517,7 @@
             }
             if (playerDir.x === 0 && playerDir.y === 0) return;
 
-            var speed = BASE_PLAYER_SPEED * speedMult * dt / Math.sqrt(zoom);
+            var speed = BASE_PLAYER_SPEED * speedMult * dt;
             var nx = player.x + playerDir.x * speed;
             var ny = player.y + playerDir.y * speed;
 
@@ -562,7 +562,7 @@
 
         /* ── Ball movement ── */
         function moveBall(dt) {
-            var speed = BASE_BALL_SPEED * speedMult * dt / Math.sqrt(zoom);
+            var speed = BASE_BALL_SPEED * speedMult * dt;
             var nx = ball.x + ball.vx * speed;
             var ny = ball.y + ball.vy * speed;
             var n = field.length;
@@ -612,9 +612,26 @@
             if (trail.length < 2) return false;
             for (var i = 0; i < trail.length - 1; i++) {
                 var d = distPointToSeg(ball, trail[i], trail[i + 1]);
-                if (d < TRAIL_HIT_DIST * (1 / Math.sqrt(zoom))) return true;
+                if (d < TRAIL_HIT_DIST) return true;
             }
             return false;
+        }
+
+        /* ── Normalize coordinates ── */
+        function normalizeField() {
+            var bbox = boundingBox(field);
+            var maxDim = Math.max(bbox.w, bbox.h);
+            if (maxDim < 0.001 || Math.abs(maxDim - 500) < 1) return;
+            var s = 500 / maxDim;
+            var ox = bbox.x, oy = bbox.y;
+            for (var i = 0; i < field.length; i++) {
+                field[i].x = (field[i].x - ox) * s;
+                field[i].y = (field[i].y - oy) * s;
+            }
+            ball.x = (ball.x - ox) * s;
+            ball.y = (ball.y - oy) * s;
+            player.x = (player.x - ox) * s;
+            player.y = (player.y - oy) * s;
         }
 
         /* ── Capture & Zoom ── */
@@ -650,6 +667,7 @@
             }
 
             if (zoom > loadBestZoom()) saveBestZoom();
+            normalizeField();
             applyZoom();
         }
 
