@@ -339,6 +339,16 @@
             return cleaned.length >= 3 ? cleaned : result;
         }
 
+        function ensureCW(verts) {
+            var area = 0;
+            for (var i = 0; i < verts.length; i++) {
+                var j = (i + 1) % verts.length;
+                area += verts[i].x * verts[j].y - verts[j].x * verts[i].y;
+            }
+            if (area < 0) verts.reverse();
+            return verts;
+        }
+
         /* ── localStorage ── */
         function loadBestZoom() {
             try { return parseFloat(localStorage.getItem('zoo-best-zoom-' + speedMult)) || 1; }
@@ -660,6 +670,7 @@
                 field = a1 > a2 ? poly1 : poly2;
             }
 
+            field = ensureCW(field);
             trail = [];
             var newArea = polygonArea(field);
             if (newArea > 0 && newArea < oldArea) {
