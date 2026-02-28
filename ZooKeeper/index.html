@@ -125,6 +125,7 @@
         var lastTime = 0;
         var animId = 0;
         var keysDown = {};
+        var cornerPause = false;
 
         /* ── DOM ── */
         var svgEl = document.getElementById('game-svg');
@@ -217,6 +218,16 @@
         function edgeDir(edgeIdx) {
             var a = field[edgeIdx], b = field[(edgeIdx + 1) % field.length];
             return normalize({ x: b.x - a.x, y: b.y - a.y });
+        }
+
+        function isConcaveVertex(vertexIdx) {
+            var n = field.length;
+            var prev = field[(vertexIdx - 1 + n) % n];
+            var curr = field[vertexIdx];
+            var next = field[(vertexIdx + 1) % n];
+            var d1 = { x: curr.x - prev.x, y: curr.y - prev.y };
+            var d2 = { x: next.x - curr.x, y: next.y - curr.y };
+            return cross2(d1, d2) < -0.001;
         }
 
         function projectOnBorderOf(px, py, verts) {
@@ -412,6 +423,7 @@
             playerEdge = 0;
             trail = [];
             trailStart = null;
+            cornerPause = false;
 
             var angle = Math.random() * Math.PI * 2;
             ball.x = FIELD_W / 2;
@@ -474,6 +486,12 @@
 
         function movePlayerSafe(dt) {
             var dir = getActiveDir();
+            if (cornerPause) {
+                if (dir.x === 0 && dir.y === 0) {
+                    cornerPause = false;
+                }
+                return;
+            }
             if (dir.x === 0 && dir.y === 0) return;
 
             var speed = BASE_PLAYER_SPEED * speedMult * dt;
@@ -493,12 +511,19 @@
 
                 if (newT > 1) {
                     playerEdge = (playerEdge + 1) % field.length;
-                    var na = field[playerEdge], nb = field[(playerEdge + 1) % field.length];
-                    player.x = na.x; player.y = na.y;
+                    player.x = field[playerEdge].x;
+                    player.y = field[playerEdge].y;
+                    if (isConcaveVertex(playerEdge)) {
+                        cornerPause = true;
+                    }
                 } else if (newT < 0) {
                     playerEdge = (playerEdge - 1 + field.length) % field.length;
-                    var na = field[playerEdge], nb = field[(playerEdge + 1) % field.length];
-                    player.x = nb.x; player.y = nb.y;
+                    var nb = field[(playerEdge + 1) % field.length];
+                    player.x = nb.x;
+                    player.y = nb.y;
+                    if (isConcaveVertex((playerEdge + 1) % field.length)) {
+                        cornerPause = true;
+                    }
                 } else {
                     player.x = a.x + (b.x - a.x) * newT;
                     player.y = a.y + (b.y - a.y) * newT;
@@ -531,6 +556,11 @@
             var nx = player.x + playerDir.x * speed;
             var ny = player.y + playerDir.y * speed;
 
+            if (checkTrailSelfCross(nx, ny)) {
+                endGame();
+                return;
+            }
+
             var n = field.length;
             var bestHit = null;
             var bestT = Infinity;
@@ -555,7 +585,17 @@
             } else {
                 player.x = nx;
                 player.y = ny;
-                trail.push({ x: nx, y: ny });
+                if (trail.length >= 2) {
+                    var pc = trail[trail.length - 2], pl = trail[trail.length - 1];
+                    var dxPrev = Math.sign(pl.x - pc.x), dyPrev = Math.sign(pl.y - pc.y);
+                    if (playerDir.x === dxPrev && playerDir.y === dyPrev) {
+                        trail[trail.length - 1] = { x: nx, y: ny };
+                    } else {
+                        trail.push({ x: nx, y: ny });
+                    }
+                } else {
+                    trail.push({ x: nx, y: ny });
+                }
 
                 if (!pointInPolygon({ x: nx, y: ny }, field)) {
                     var proj = projectOnBorder(nx, ny);
@@ -623,6 +663,19 @@
             for (var i = 0; i < trail.length - 1; i++) {
                 var d = distPointToSeg(ball, trail[i], trail[i + 1]);
                 if (d < TRAIL_HIT_DIST) return true;
+            }
+            return false;
+        }
+
+        function checkTrailSelfCross(nx, ny) {
+            if (trail.length < 3) return false;
+            var p1 = trail[trail.length - 1];
+            var p2 = { x: nx, y: ny };
+            for (var i = 0; i < trail.length - 2; i++) {
+                var hit = segSegIntersection(p1, p2, trail[i], trail[i + 1]);
+                if (hit && hit.t > 0.001 && hit.u > 0.001 && hit.u < 0.999) {
+                    return true;
+                }
             }
             return false;
         }
@@ -764,6 +817,15 @@
         /* ── Controls ── */
         document.addEventListener('keydown', function (e) {
             keysDown[e.key] = true;
+            if (!settingsEl.classList.contains('hidden')) {
+                if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                    var val = parseInt(settingSpeedEl.value, 10);
+                    if (e.key === 'ArrowRight' && val < 3) val++;
+                    if (e.key === 'ArrowLeft' && val > 0) val--;
+                    settingSpeedEl.value = val;
+                    settingSpeedEl.dispatchEvent(new Event('input'));
+                }
+            }
             if (e.key === ' ') {
                 if (gameOver) restartGame();
                 else if (!gameStarted) startGame();
