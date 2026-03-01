@@ -1,2 +1,3 @@
 # Web-Games
-A few games for my personal website.
+
+A [few games](https://armanddelessert.github.io/Games/) for [my personal website](https://armanddelessert.github.io/).
