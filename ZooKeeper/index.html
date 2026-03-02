@@ -32,7 +32,7 @@
         }
         #game-container { position: relative; display: flex; flex-direction: column; align-items: center; }
         #info { font-size: 1.1rem; font-variant-numeric: tabular-nums; margin-bottom: 0.75rem; }
-        #game-svg { display: block; border: 1px solid var(--color-fg); }
+        #game-svg { display: block; border: 1px solid var(--color-fg); overflow: visible; }
         .svg-bg { fill: var(--color-fg); }
         .svg-field { fill: var(--color-bg); stroke: none; }
         .svg-trail { fill: none; stroke: var(--color-trail); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -71,7 +71,7 @@
     <div id="game-container">
         <p id="info">Zoom : ×1.0</p>
         <svg id="game-svg" xmlns="http://www.w3.org/2000/svg">
-            <rect class="svg-bg" x="-99999" y="-99999" width="199998" height="199998" />
+            <rect id="svg-bg" class="svg-bg" x="0" y="0" width="500" height="500" />
             <polygon id="svg-field" class="svg-field" points="" />
             <polyline id="svg-trail" class="svg-trail" points="" />
             <circle id="svg-ball" class="svg-ball" r="4" cx="0" cy="0" />
@@ -92,7 +92,7 @@
                     </div>
                 </div>
                 <p id="best-score"></p>
-                <p id="restart-hint">Appuyer sur &laquo;&nbsp;Espace&nbsp;&raquo; pour jouer</p>
+                <p id="restart-hint"></p>
             </div>
         </div>
     </div>
@@ -105,10 +105,11 @@
         var SPEED_LABELS = ['Lente', 'Normale', 'Rapide', 'Très rapide'];
         var BASE_PLAYER_SPEED = 200;
         var BASE_BALL_SPEED = 160;
-        var BALL_R = 4;
-        var PLAYER_SIZE = 8;
-        var EPS = 0.5;
-        var TRAIL_HIT_DIST = 3;
+        var BALL_R = 4;           // recomputed in resize()
+        var PLAYER_SIZE = 8;      // recomputed in resize()
+        var EPS = 0.5;            // recomputed in resize()
+        var TRAIL_HIT_DIST = 3;   // recomputed in resize()
+        var isTouchDevice = ('ontouchstart' in window);
 
         /* ── State ── */
         var field = [];
@@ -131,6 +132,7 @@
 
         /* ── DOM ── */
         var svgEl = document.getElementById('game-svg');
+        var bgEl = document.getElementById('svg-bg');
         var fieldEl = document.getElementById('svg-field');
         var trailEl = document.getElementById('svg-trail');
         var ballEl = document.getElementById('svg-ball');
@@ -380,20 +382,34 @@
 
         /* ── Sizing ── */
         function resize() {
-            var maxW = window.innerWidth - 32;
-            var maxH = window.innerHeight - 80;
-            var ratio = maxW / maxH;
+            var infoH = infoEl.offsetHeight +
+                        parseInt(getComputedStyle(infoEl).marginBottom) + 4;
+            var maxW = window.innerWidth;
+            var maxH = window.innerHeight - infoH;
             FIELD_W = 500;
-            FIELD_H = Math.round(FIELD_W / ratio);
+            // Exact float ratio — matches SVG element AR → no letterboxing at game start
+            FIELD_H = FIELD_W * maxH / maxW;
             svgEl.setAttribute('width', maxW);
             svgEl.setAttribute('height', maxH);
+
+            // Update svg-bg to exact field dimensions (avoids dark letterbox bands)
+            bgEl.setAttribute('width', FIELD_W);
+            bgEl.setAttribute('height', FIELD_H);
+
+            // Proportional element sizes based on smallest field dimension
+            var minDim = Math.min(FIELD_W, FIELD_H);
+            BALL_R         = minDim * 0.008;
+            PLAYER_SIZE    = minDim * 0.016;
+            TRAIL_HIT_DIST = BALL_R * 0.75;
+            EPS            = minDim * 0.001;
         }
 
         function initViewBox() {
             var bbox = boundingBox(field);
-            var pad = Math.max(bbox.w, bbox.h) * 0.005;
+            // No padding: viewBox = exact field bounding box
+            // CSS border provides the visual frame; overflow:visible shows player at edges
             svgEl.setAttribute('viewBox',
-                (bbox.x - pad) + ' ' + (bbox.y - pad) + ' ' + (bbox.w + pad * 2) + ' ' + (bbox.h + pad * 2));
+                bbox.x + ' ' + bbox.y + ' ' + bbox.w + ' ' + bbox.h);
         }
 
         function boundingBox(verts) {
@@ -786,7 +802,9 @@
             finalScoreEl.textContent = 'Zoom atteint : ×' + zoom.toFixed(1);
             var best = loadBestZoom();
             bestScoreEl.textContent = 'Meilleur : ×' + best.toFixed(1);
-            restartHintEl.textContent = 'Appuyer sur \u00ab\u00a0Espace\u00a0\u00bb pour recommencer';
+            restartHintEl.textContent = isTouchDevice
+                ? 'Toucher pour recommencer'
+                : 'Espace\u00a0/ Entr\u00e9e pour recommencer';
             overlayEl.classList.remove('hidden');
         }
 
@@ -795,7 +813,9 @@
             gameOverTextEl.textContent = 'Zoo Keeper';
             finalScoreEl.textContent = '';
             settingsEl.classList.remove('hidden');
-            restartHintEl.textContent = 'Appuyer sur \u00ab\u00a0Espace\u00a0\u00bb pour jouer';
+            restartHintEl.textContent = isTouchDevice
+                ? 'Toucher pour jouer'
+                : 'Espace\u00a0/ Entr\u00e9e pour jouer';
             initGame();
             overlayEl.classList.remove('hidden');
         }
@@ -828,7 +848,7 @@
                     settingSpeedEl.dispatchEvent(new Event('input'));
                 }
             }
-            if (e.key === ' ') {
+            if (e.key === ' ' || e.key === 'Enter') {
                 if (gameOver) restartGame();
                 else if (!gameStarted) startGame();
                 e.preventDefault();
@@ -841,39 +861,56 @@
             keysDown[e.key] = false;
         });
 
-        /* ── Touch controls ── */
+        /* ── Touch controls — zone-based, document-level ── */
         var touchStartX, touchStartY;
-        var MIN_SWIPE = 30;
 
-        svgEl.addEventListener('touchstart', function (e) {
+        // Divide screen into 4 quadrants from centre; returns the dominant arrow key or null
+        function getTouchZoneDir(cx, cy) {
+            var mx = window.innerWidth / 2;
+            var my = window.innerHeight / 2;
+            var dx = cx - mx, dy = cy - my;
+            if (Math.abs(dx) < 30 && Math.abs(dy) < 30) return null; // dead zone
+            return Math.abs(dx) > Math.abs(dy)
+                ? (dx > 0 ? 'ArrowRight' : 'ArrowLeft')
+                : (dy > 0 ? 'ArrowDown'  : 'ArrowUp');
+        }
+
+        document.addEventListener('touchstart', function (e) {
+            // Let slider / label touches pass through untouched
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'LABEL') return;
             touchStartX = e.touches[0].clientX;
             touchStartY = e.touches[0].clientY;
+            if (gameStarted && !gameOver) {
+                var dir = getTouchZoneDir(touchStartX, touchStartY);
+                if (dir) { keysDown = {}; keysDown[dir] = true; }
+            }
             e.preventDefault();
         }, { passive: false });
 
-        svgEl.addEventListener('touchend', function (e) {
-            if (touchStartX === undefined) return;
-            var dx = e.changedTouches[0].clientX - touchStartX;
-            var dy = e.changedTouches[0].clientY - touchStartY;
+        document.addEventListener('touchmove', function (e) {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'LABEL') return;
+            e.preventDefault();
+            if (!gameStarted || gameOver) return;
+            var dir = getTouchZoneDir(e.touches[0].clientX, e.touches[0].clientY);
+            keysDown = {};
+            if (dir) keysDown[dir] = true;
+        }, { passive: false });
+
+        document.addEventListener('touchend', function (e) {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'LABEL') return;
+            keysDown = {};
+            if (touchStartX !== undefined) {
+                var dx = e.changedTouches[0].clientX - touchStartX;
+                var dy = e.changedTouches[0].clientY - touchStartY;
+                // Tap detection: short touch with minimal movement → start / restart
+                if (Math.abs(dx) < 20 && Math.abs(dy) < 20) {
+                    if (gameOver) restartGame();
+                    else if (!gameStarted) startGame();
+                }
+            }
             touchStartX = undefined;
-
-            if (Math.abs(dx) < MIN_SWIPE && Math.abs(dy) < MIN_SWIPE) {
-                if (gameOver) restartGame();
-                else if (!gameStarted) startGame();
-                return;
-            }
-
-            if (Math.abs(dx) > Math.abs(dy)) {
-                keysDown = {};
-                keysDown[dx > 0 ? 'ArrowRight' : 'ArrowLeft'] = true;
-                setTimeout(function () { keysDown = {}; }, 150);
-            } else {
-                keysDown = {};
-                keysDown[dy > 0 ? 'ArrowDown' : 'ArrowUp'] = true;
-                setTimeout(function () { keysDown = {}; }, 150);
-            }
-            e.preventDefault();
-        }, { passive: false });
+            touchStartY = undefined;
+        }, { passive: true });
 
         /* ── Resize ── */
         window.addEventListener('resize', function () {
@@ -887,6 +924,9 @@
         settingSpeedEl.value = savedSpeed;
         updateSettingLabels();
         readSettings();
+        restartHintEl.textContent = isTouchDevice
+            ? 'Toucher pour jouer'
+            : 'Espace\u00a0/ Entr\u00e9e pour jouer';
         initGame();
     })();
     </script>
