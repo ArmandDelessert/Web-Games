@@ -97,7 +97,7 @@
                     </div>
                 </div>
                 <p id="best-score"></p>
-                <p id="restart-hint">Appuyer sur &laquo;&nbsp;Espace&nbsp;&raquo; pour jouer</p>
+                <p id="restart-hint"></p>
             </div>
         </div>
     </div>
@@ -113,6 +113,7 @@
         var GROWTH_PER_FOOD = 15;
         var SPEED_VALUES = [80, 120, 160, 200];
         var SPEED_LABELS = ['Lente', 'Normale', 'Rapide', 'Tr\u00e8s rapide'];
+        var isTouchDevice = ('ontouchstart' in window);
 
         /* ── State ── */
         var snakePath = [];
@@ -422,7 +423,7 @@
                 bestScoreEl.textContent = 'Meilleur : ' + Math.max(best, score);
             }
 
-            restartHintEl.textContent = 'Appuyer sur \u00ab\u00a0Espace\u00a0\u00bb pour recommencer';
+            restartHintEl.textContent = isTouchDevice ? 'Toucher pour recommencer' : 'Appuyer sur \u00ab\u00a0Espace\u00a0\u00bb pour recommencer';
             overlayEl.classList.remove('hidden');
         }
 
@@ -431,7 +432,7 @@
             finalScoreEl.textContent = '';
             settingsEl.classList.remove('hidden');
             showBestScore();
-            restartHintEl.textContent = 'Appuyer sur \u00ab\u00a0Espace\u00a0\u00bb pour jouer';
+            restartHintEl.textContent = isTouchDevice ? 'Toucher pour jouer' : 'Appuyer sur \u00ab\u00a0Espace\u00a0\u00bb pour jouer';
             initGame();
             overlayEl.classList.remove('hidden');
         }
@@ -475,8 +476,8 @@
                 }
             }
 
-            // Space: start/restart
-            if (e.key === ' ') {
+            // Space/Enter: start/restart
+            if (e.key === ' ' || e.key === 'Enter') {
                 if (gameOver) restartGame();
                 else if (!gameStarted) startGame();
             }
@@ -502,13 +503,13 @@
                 }
             }
 
-            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].indexOf(e.key) !== -1) {
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Enter'].indexOf(e.key) !== -1) {
                 e.preventDefault();
             }
         });
 
         /* ── Touch controls ── */
-        var touchStartX, touchStartY, touchActive = false;
+        var touchActive = false;
 
         function screenToSVG(clientX, clientY) {
             var pt = svgEl.createSVGPoint();
@@ -520,8 +521,6 @@
         }
 
         svgEl.addEventListener('touchstart', function (e) {
-            touchStartX = e.touches[0].clientX;
-            touchStartY = e.touches[0].clientY;
             touchActive = true;
             e.preventDefault();
         }, { passive: false });
@@ -545,13 +544,23 @@
         }, { passive: false });
 
         svgEl.addEventListener('touchend', function (e) {
-            if (touchStartX === undefined) return;
-            var dx = e.changedTouches[0].clientX - touchStartX;
-            var dy = e.changedTouches[0].clientY - touchStartY;
-            touchStartX = undefined;
             touchActive = false;
+            e.preventDefault();
+        }, { passive: false });
 
-            // Tap detection (short touch, no significant movement)
+        // Tap-to-start / tap-to-restart via overlay (overlay intercepts touches when visible)
+        var overlayTouchStartX, overlayTouchStartY;
+        overlayEl.addEventListener('touchstart', function (e) {
+            overlayTouchStartX = e.touches[0].clientX;
+            overlayTouchStartY = e.touches[0].clientY;
+            e.preventDefault();
+        }, { passive: false });
+
+        overlayEl.addEventListener('touchend', function (e) {
+            if (overlayTouchStartX === undefined) return;
+            var dx = e.changedTouches[0].clientX - overlayTouchStartX;
+            var dy = e.changedTouches[0].clientY - overlayTouchStartY;
+            overlayTouchStartX = undefined;
             if (Math.abs(dx) < 20 && Math.abs(dy) < 20) {
                 if (gameOver) restartGame();
                 else if (!gameStarted) startGame();
@@ -564,6 +573,7 @@
         settingSpeedEl.value = savedSettings.speed;
         updateSettingLabels();
         showBestScore();
+        restartHintEl.textContent = isTouchDevice ? 'Toucher pour jouer' : 'Appuyer sur \u00ab\u00a0Espace\u00a0\u00bb pour jouer';
         resize();
         initGame();
     })();

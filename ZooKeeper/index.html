@@ -92,7 +92,7 @@
                     </div>
                 </div>
                 <p id="best-score"></p>
-                <p id="restart-hint">Appuyer sur &laquo;&nbsp;Espace&nbsp;&raquo; pour jouer</p>
+                <p id="restart-hint"></p>
             </div>
         </div>
     </div>
@@ -109,6 +109,7 @@
         var PLAYER_SIZE = 6;
         var EPS = 0.5;
         var TRAIL_HIT_DIST = 3;
+        var isTouchDevice = ('ontouchstart' in window);
 
         /* ── State ── */
         var field = [];
@@ -786,7 +787,7 @@
             finalScoreEl.textContent = 'Zoom atteint : ×' + zoom.toFixed(1);
             var best = loadBestZoom();
             bestScoreEl.textContent = 'Meilleur : ×' + best.toFixed(1);
-            restartHintEl.textContent = 'Appuyer sur \u00ab\u00a0Espace\u00a0\u00bb pour recommencer';
+            restartHintEl.textContent = isTouchDevice ? 'Toucher pour recommencer' : 'Appuyer sur \u00ab\u00a0Espace\u00a0\u00bb pour recommencer';
             overlayEl.classList.remove('hidden');
         }
 
@@ -795,7 +796,7 @@
             gameOverTextEl.textContent = 'Zoo Keeper';
             finalScoreEl.textContent = '';
             settingsEl.classList.remove('hidden');
-            restartHintEl.textContent = 'Appuyer sur \u00ab\u00a0Espace\u00a0\u00bb pour jouer';
+            restartHintEl.textContent = isTouchDevice ? 'Toucher pour jouer' : 'Appuyer sur \u00ab\u00a0Espace\u00a0\u00bb pour jouer';
             initGame();
             overlayEl.classList.remove('hidden');
         }
@@ -828,12 +829,12 @@
                     settingSpeedEl.dispatchEvent(new Event('input'));
                 }
             }
-            if (e.key === ' ') {
+            if (e.key === ' ' || e.key === 'Enter') {
                 if (gameOver) restartGame();
                 else if (!gameStarted) startGame();
                 e.preventDefault();
             }
-            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].indexOf(e.key) !== -1) {
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Enter'].indexOf(e.key) !== -1) {
                 e.preventDefault();
             }
         });
@@ -841,39 +842,53 @@
             keysDown[e.key] = false;
         });
 
-        /* ── Touch controls ── */
+        /* ── Touch controls — zone-based, document-level ── */
         var touchStartX, touchStartY;
-        var MIN_SWIPE = 30;
 
-        svgEl.addEventListener('touchstart', function (e) {
+        function getTouchZoneDir(cx, cy) {
+            var mx = window.innerWidth / 2;
+            var my = window.innerHeight / 2;
+            var dx = cx - mx, dy = cy - my;
+            if (Math.abs(dx) < 30 && Math.abs(dy) < 30) return null;
+            return Math.abs(dx) > Math.abs(dy)
+                ? (dx > 0 ? 'ArrowRight' : 'ArrowLeft')
+                : (dy > 0 ? 'ArrowDown'  : 'ArrowUp');
+        }
+
+        document.addEventListener('touchstart', function (e) {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'LABEL') return;
             touchStartX = e.touches[0].clientX;
             touchStartY = e.touches[0].clientY;
+            if (gameStarted && !gameOver) {
+                var dir = getTouchZoneDir(touchStartX, touchStartY);
+                if (dir) { keysDown = {}; keysDown[dir] = true; }
+            }
             e.preventDefault();
         }, { passive: false });
 
-        svgEl.addEventListener('touchend', function (e) {
-            if (touchStartX === undefined) return;
-            var dx = e.changedTouches[0].clientX - touchStartX;
-            var dy = e.changedTouches[0].clientY - touchStartY;
+        document.addEventListener('touchmove', function (e) {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'LABEL') return;
+            e.preventDefault();
+            if (!gameStarted || gameOver) return;
+            var dir = getTouchZoneDir(e.touches[0].clientX, e.touches[0].clientY);
+            keysDown = {};
+            if (dir) keysDown[dir] = true;
+        }, { passive: false });
+
+        document.addEventListener('touchend', function (e) {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'LABEL') return;
+            keysDown = {};
+            if (touchStartX !== undefined) {
+                var dx = e.changedTouches[0].clientX - touchStartX;
+                var dy = e.changedTouches[0].clientY - touchStartY;
+                if (Math.abs(dx) < 20 && Math.abs(dy) < 20) {
+                    if (gameOver) restartGame();
+                    else if (!gameStarted) startGame();
+                }
+            }
             touchStartX = undefined;
-
-            if (Math.abs(dx) < MIN_SWIPE && Math.abs(dy) < MIN_SWIPE) {
-                if (gameOver) restartGame();
-                else if (!gameStarted) startGame();
-                return;
-            }
-
-            if (Math.abs(dx) > Math.abs(dy)) {
-                keysDown = {};
-                keysDown[dx > 0 ? 'ArrowRight' : 'ArrowLeft'] = true;
-                setTimeout(function () { keysDown = {}; }, 150);
-            } else {
-                keysDown = {};
-                keysDown[dy > 0 ? 'ArrowDown' : 'ArrowUp'] = true;
-                setTimeout(function () { keysDown = {}; }, 150);
-            }
-            e.preventDefault();
-        }, { passive: false });
+            touchStartY = undefined;
+        }, { passive: true });
 
         /* ── Resize ── */
         window.addEventListener('resize', function () {
@@ -887,6 +902,7 @@
         settingSpeedEl.value = savedSpeed;
         updateSettingLabels();
         readSettings();
+        restartHintEl.textContent = isTouchDevice ? 'Toucher pour jouer' : 'Appuyer sur \u00ab\u00a0Espace\u00a0\u00bb pour jouer';
         initGame();
     })();
     </script>
