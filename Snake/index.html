@@ -33,7 +33,7 @@
 
         #game-container { position: relative; display: flex; flex-direction: column; align-items: center; }
         #score { font-size: 1.1rem; font-variant-numeric: tabular-nums; margin-bottom: 0.75rem; }
-        #game-svg { display: block; border: 1px solid var(--color-fg); overflow: visible; }
+        #game-svg { display: block; border: 1px solid var(--color-fg); }
 
         .svg-bg { fill: var(--color-bg); }
         .svg-border { fill: none; stroke: var(--color-fg); stroke-width: 1; }
@@ -97,7 +97,7 @@
                     </div>
                 </div>
                 <p id="best-score"></p>
-                <p id="restart-hint"></p>
+                <p id="restart-hint">Appuyer sur &laquo;&nbsp;Espace&nbsp;&raquo; pour jouer</p>
             </div>
         </div>
     </div>
@@ -107,13 +107,12 @@
         /* ── Constants ── */
         var FIELD_W = 500;
         var FIELD_H = 500;
-        var SNAKE_WIDTH = 3;      // recomputed in resize()
-        var FOOD_R = 5;           // recomputed in resize()
-        var INITIAL_LENGTH = 30;  // recomputed in resize()
-        var GROWTH_PER_FOOD = 15; // recomputed in resize()
+        var SNAKE_WIDTH = 3;
+        var FOOD_R = 5;
+        var INITIAL_LENGTH = 30;
+        var GROWTH_PER_FOOD = 15;
         var SPEED_VALUES = [80, 120, 160, 200];
         var SPEED_LABELS = ['Lente', 'Normale', 'Rapide', 'Tr\u00e8s rapide'];
-        var isTouchDevice = ('ontouchstart' in window);
 
         /* ── State ── */
         var snakePath = [];
@@ -210,13 +209,12 @@
 
         /* ── Sizing ── */
         function resize() {
-            var scoreH = scoreEl.offsetHeight +
-                         parseInt(getComputedStyle(scoreEl).marginBottom) + 4;
-            var maxW = window.innerWidth;
-            var maxH = window.innerHeight - scoreH;
+            var maxW = window.innerWidth - 32;
+            var maxH = window.innerHeight - 80;
 
-            // Field height matches screen ratio exactly — no clamp, no rounding
-            FIELD_H = FIELD_W * maxH / maxW;
+            // Compute field height from screen ratio
+            FIELD_H = Math.round(FIELD_W * maxH / maxW);
+            FIELD_H = Math.max(300, Math.min(700, FIELD_H));
 
             svgEl.setAttribute('viewBox', '0 0 ' + FIELD_W + ' ' + FIELD_H);
 
@@ -226,16 +224,18 @@
             borderEl.setAttribute('width', FIELD_W);
             borderEl.setAttribute('height', FIELD_H);
 
-            // SVG fills the entire available screen (viewBox AR = SVG AR → no letterboxing)
-            svgEl.style.width = maxW + 'px';
-            svgEl.style.height = maxH + 'px';
-
-            // Proportional element sizes based on smallest field dimension
-            var minDim = Math.min(FIELD_W, FIELD_H);
-            FOOD_R          = minDim * 0.010;
-            SNAKE_WIDTH     = minDim * 0.006;
-            INITIAL_LENGTH  = minDim * 0.060;
-            GROWTH_PER_FOOD = minDim * 0.030;
+            // Size the SVG element in pixels, preserving ratio
+            var ratio = FIELD_W / FIELD_H;
+            var svgW, svgH;
+            if (maxW / maxH > ratio) {
+                svgH = maxH;
+                svgW = svgH * ratio;
+            } else {
+                svgW = maxW;
+                svgH = svgW / ratio;
+            }
+            svgEl.style.width = svgW + 'px';
+            svgEl.style.height = svgH + 'px';
 
             // If food is out of bounds after resize, reposition it
             if (food.x > FIELD_W - FOOD_R || food.y > FIELD_H - FOOD_R) {
@@ -369,18 +369,15 @@
                 pts += snakePath[i].x.toFixed(1) + ',' + snakePath[i].y.toFixed(1);
             }
             snakeEl.setAttribute('points', pts);
-            snakeEl.setAttribute('stroke-width', SNAKE_WIDTH.toFixed(2));
 
-            // Snake head (radius proportional to snake width)
+            // Snake head
             var head = snakePath[snakePath.length - 1];
             headEl.setAttribute('cx', head.x.toFixed(1));
             headEl.setAttribute('cy', head.y.toFixed(1));
-            headEl.setAttribute('r', (SNAKE_WIDTH * 1.2).toFixed(2));
 
             // Food
             foodEl.setAttribute('cx', food.x.toFixed(1));
             foodEl.setAttribute('cy', food.y.toFixed(1));
-            foodEl.setAttribute('r', FOOD_R.toFixed(2));
         }
 
         /* ── Game lifecycle ── */
@@ -425,9 +422,7 @@
                 bestScoreEl.textContent = 'Meilleur : ' + Math.max(best, score);
             }
 
-            restartHintEl.textContent = isTouchDevice
-                ? 'Toucher pour recommencer'
-                : 'Espace\u00a0/ Entr\u00e9e pour recommencer';
+            restartHintEl.textContent = 'Appuyer sur \u00ab\u00a0Espace\u00a0\u00bb pour recommencer';
             overlayEl.classList.remove('hidden');
         }
 
@@ -436,9 +431,7 @@
             finalScoreEl.textContent = '';
             settingsEl.classList.remove('hidden');
             showBestScore();
-            restartHintEl.textContent = isTouchDevice
-                ? 'Toucher pour jouer'
-                : 'Espace\u00a0/ Entr\u00e9e pour jouer';
+            restartHintEl.textContent = 'Appuyer sur \u00ab\u00a0Espace\u00a0\u00bb pour jouer';
             initGame();
             overlayEl.classList.remove('hidden');
         }
@@ -482,8 +475,8 @@
                 }
             }
 
-            // Space or Enter: start/restart
-            if (e.key === ' ' || e.key === 'Enter') {
+            // Space: start/restart
+            if (e.key === ' ') {
                 if (gameOver) restartGame();
                 else if (!gameStarted) startGame();
             }
@@ -509,13 +502,13 @@
                 }
             }
 
-            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Enter'].indexOf(e.key) !== -1) {
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].indexOf(e.key) !== -1) {
                 e.preventDefault();
             }
         });
 
         /* ── Touch controls ── */
-        var touchActive = false;
+        var touchStartX, touchStartY, touchActive = false;
 
         function screenToSVG(clientX, clientY) {
             var pt = svgEl.createSVGPoint();
@@ -526,8 +519,9 @@
             return pt.matrixTransform(ctm.inverse());
         }
 
-        // In-game direction control via touch (overlay hidden during gameplay)
         svgEl.addEventListener('touchstart', function (e) {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
             touchActive = true;
             e.preventDefault();
         }, { passive: false });
@@ -551,23 +545,13 @@
         }, { passive: false });
 
         svgEl.addEventListener('touchend', function (e) {
+            if (touchStartX === undefined) return;
+            var dx = e.changedTouches[0].clientX - touchStartX;
+            var dy = e.changedTouches[0].clientY - touchStartY;
+            touchStartX = undefined;
             touchActive = false;
-            e.preventDefault();
-        }, { passive: false });
 
-        // Tap-to-start / tap-to-restart via overlay (overlay intercepts touches when visible)
-        var overlayTouchStartX, overlayTouchStartY;
-        overlayEl.addEventListener('touchstart', function (e) {
-            overlayTouchStartX = e.touches[0].clientX;
-            overlayTouchStartY = e.touches[0].clientY;
-            e.preventDefault();
-        }, { passive: false });
-
-        overlayEl.addEventListener('touchend', function (e) {
-            if (overlayTouchStartX === undefined) return;
-            var dx = e.changedTouches[0].clientX - overlayTouchStartX;
-            var dy = e.changedTouches[0].clientY - overlayTouchStartY;
-            overlayTouchStartX = undefined;
+            // Tap detection (short touch, no significant movement)
             if (Math.abs(dx) < 20 && Math.abs(dy) < 20) {
                 if (gameOver) restartGame();
                 else if (!gameStarted) startGame();
@@ -580,9 +564,6 @@
         settingSpeedEl.value = savedSettings.speed;
         updateSettingLabels();
         showBestScore();
-        restartHintEl.textContent = isTouchDevice
-            ? 'Toucher pour jouer'
-            : 'Espace\u00a0/ Entr\u00e9e pour jouer';
         resize();
         initGame();
     })();
