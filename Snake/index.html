@@ -214,8 +214,7 @@
             var maxH = window.innerHeight - 80;
 
             // Compute field height from screen ratio
-            FIELD_H = Math.round(FIELD_W * maxH / maxW);
-            FIELD_H = Math.max(300, Math.min(700, FIELD_H));
+            FIELD_H = FIELD_W * maxH / maxW;
 
             svgEl.setAttribute('viewBox', '0 0 ' + FIELD_W + ' ' + FIELD_H);
 
@@ -225,18 +224,9 @@
             borderEl.setAttribute('width', FIELD_W);
             borderEl.setAttribute('height', FIELD_H);
 
-            // Size the SVG element in pixels, preserving ratio
-            var ratio = FIELD_W / FIELD_H;
-            var svgW, svgH;
-            if (maxW / maxH > ratio) {
-                svgH = maxH;
-                svgW = svgH * ratio;
-            } else {
-                svgW = maxW;
-                svgH = svgW / ratio;
-            }
-            svgEl.style.width = svgW + 'px';
-            svgEl.style.height = svgH + 'px';
+            // SVG fills available space (viewBox ratio = element ratio → no letterboxing)
+            svgEl.style.width = maxW + 'px';
+            svgEl.style.height = maxH + 'px';
 
             // If food is out of bounds after resize, reposition it
             if (food.x > FIELD_W - FOOD_R || food.y > FIELD_H - FOOD_R) {
