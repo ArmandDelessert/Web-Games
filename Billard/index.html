@@ -10,18 +10,18 @@
             --color-bg: #fafafa;
             --color-fg: #1a1a1a;
             --color-muted: #999;
-            --color-felt: #2a7a3a;
-            --color-cushion: #1a5428;
-            --color-wood: #5c3a1e;
+            --color-felt: #e0e0e0;
+            --color-cushion: #888;
+            --color-wood: #555;
         }
         @media (prefers-color-scheme: dark) {
             :root {
                 --color-bg: #121212;
                 --color-fg: #e0e0e0;
                 --color-muted: #666;
-                --color-felt: #1b5c2b;
-                --color-cushion: #0f3d1a;
-                --color-wood: #3a2510;
+                --color-felt: #1a1a1a;
+                --color-cushion: #444;
+                --color-wood: #333;
             }
         }
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -147,23 +147,19 @@
         <h3>Parametres</h3>
         <div class="setting-row">
             <label>Billes <span id="val-balls">10</span></label>
-            <input type="range" id="s-balls" min="1" max="15" step="1" value="10">
+            <input type="range" id="s-balls" min="0" max="4" step="1" value="3">
         </div>
         <div class="setting-row">
-            <label>Taille des billes <span id="val-bsize">3</span></label>
-            <input type="range" id="s-bsize" min="1" max="5" step="1" value="3">
+            <label>Taille <span id="val-size">3</span></label>
+            <input type="range" id="s-size" min="1" max="5" step="1" value="3">
         </div>
         <div class="setting-row">
             <label>Inertie <span id="val-inertia">5</span></label>
             <input type="range" id="s-inertia" min="1" max="10" step="1" value="5">
         </div>
         <div class="setting-row">
-            <label>Nombre de trous <span id="val-pockets">6</span></label>
-            <input type="range" id="s-pockets" min="0" max="6" step="1" value="6">
-        </div>
-        <div class="setting-row">
-            <label>Taille des trous <span id="val-psize">3</span></label>
-            <input type="range" id="s-psize" min="1" max="5" step="1" value="3">
+            <label>Trous <span id="val-pockets">6</span></label>
+            <input type="range" id="s-pockets" min="0" max="3" step="1" value="2">
         </div>
         <div class="setting-row">
             <label>Puissance max <span id="val-power">3</span></label>
@@ -204,50 +200,45 @@
         /* Slider elements */
         var sliders = {
             balls:   document.getElementById('s-balls'),
-            bsize:   document.getElementById('s-bsize'),
+            size:    document.getElementById('s-size'),
             inertia: document.getElementById('s-inertia'),
             pockets: document.getElementById('s-pockets'),
-            psize:   document.getElementById('s-psize'),
             power:   document.getElementById('s-power')
         };
         var valEls = {
             balls:   document.getElementById('val-balls'),
-            bsize:   document.getElementById('val-bsize'),
+            size:    document.getElementById('val-size'),
             inertia: document.getElementById('val-inertia'),
             pockets: document.getElementById('val-pockets'),
-            psize:   document.getElementById('val-psize'),
             power:   document.getElementById('val-power')
         };
 
         /* ══════════════════════════════════════
-         *  Ball colors (classic pool)
+         *  Ball colors — retro-neon style
+         *  Evenly spaced hues; brighter in dark mode, darker in light mode.
          * ══════════════════════════════════════ */
-        var BALL_COLORS = [
-            '#ffffff',  // 0  cue
-            '#f5c518',  // 1  yellow
-            '#2255bb',  // 2  blue
-            '#cc2233',  // 3  red
-            '#7733aa',  // 4  purple
-            '#e87500',  // 5  orange
-            '#1b8040',  // 6  green
-            '#882222',  // 7  maroon
-            '#1a1a1a',  // 8  black
-            '#f5c518',  // 9  yellow stripe
-            '#2255bb',  // 10 blue stripe
-            '#cc2233',  // 11 red stripe
-            '#7733aa',  // 12 purple stripe
-            '#e87500',  // 13 orange stripe
-            '#1b8040',  // 14 green stripe
-            '#882222'   // 15 maroon stripe
-        ];
+        function generateBallColors(n) {
+            var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            var sat = isDark ? 90 : 80;
+            var lum = isDark ? 62 : 42;
+            var colors = [];
+            for (var i = 0; i < n; i++) {
+                var hue = Math.round((i * 360) / n);
+                colors.push('hsl(' + hue + ',' + sat + '%,' + lum + '%)');
+            }
+            return colors;
+        }
 
         /* ══════════════════════════════════════
          *  Settings
          * ══════════════════════════════════════ */
         var STORAGE_KEY = 'billard-settings';
+        var BALL_COUNTS = [1, 3, 6, 10, 15];
+        var POCKET_COUNTS = [0, 4, 6, 8];
+
         var cfg = {
-            balls: 10, bsize: 3, inertia: 5,
-            pockets: 6, psize: 3, power: 3
+            balls: 3, size: 3, inertia: 5,
+            pockets: 2, power: 3
         };
 
         function loadSettings() {
@@ -268,23 +259,33 @@
         function syncSlidersFromCfg() {
             for (var k in sliders) {
                 sliders[k].value = cfg[k];
-                valEls[k].textContent = cfg[k];
             }
+            updateSliderLabels();
         }
 
         function readSlidersIntoCfg() {
             for (var k in sliders) {
                 cfg[k] = parseInt(sliders[k].value, 10);
-                valEls[k].textContent = cfg[k];
             }
+            updateSliderLabels();
             saveSettings();
         }
 
+        function updateSliderLabels() {
+            valEls.balls.textContent = BALL_COUNTS[cfg.balls];
+            valEls.size.textContent = cfg.size;
+            valEls.inertia.textContent = cfg.inertia;
+            valEls.pockets.textContent = POCKET_COUNTS[cfg.pockets];
+            valEls.power.textContent = cfg.power;
+        }
+
         /* derived physics values from cfg */
+        function getBallCount()     { return BALL_COUNTS[cfg.balls]; }
+        function getPocketCount()   { return POCKET_COUNTS[cfg.pockets]; }
         function frictionFromCfg()  { return 0.96 + cfg.inertia * 0.004; }
         function maxPowerFromCfg()  { return 8 + cfg.power * 5; }
-        function ballRadiusRatio()  { return 0.012 + cfg.bsize * 0.005; }
-        function pocketRadiusRatio(){ return 0.025 + cfg.psize * 0.01; }
+        function ballRadiusRatio()  { return 0.012 + cfg.size * 0.005; }
+        function pocketRadiusRatio(){ return (0.012 + cfg.size * 0.005) * 2.2; }
 
         /* ══════════════════════════════════════
          *  Layout (recomputed on resize)
@@ -318,22 +319,40 @@
         }
 
         function computePockets() {
-            /* Available canonical positions (priority order):
-             * 4 corners first, then 2 mid-sides */
-            var cands = [
-                { x: TX, y: TY },                    // top-left
-                { x: TX + TW, y: TY + TH },          // bottom-right
-                { x: TX + TW, y: TY },                // top-right
-                { x: TX, y: TY + TH },                // bottom-left
-                { x: TX + TW / 2, y: TY },            // top-center
-                { x: TX + TW / 2, y: TY + TH }       // bottom-center
-            ];
-            pockets = cands.slice(0, cfg.pockets);
+            var n = getPocketCount();
+            pockets = [];
+            if (n === 0) return;
+            /* 4 corners */
+            pockets.push({ x: TX, y: TY });
+            pockets.push({ x: TX + TW, y: TY });
+            pockets.push({ x: TX, y: TY + TH });
+            pockets.push({ x: TX + TW, y: TY + TH });
+            if (n >= 6) {
+                /* Centers of the two longest sides */
+                if (TW >= TH) {
+                    pockets.push({ x: TX + TW / 2, y: TY });
+                    pockets.push({ x: TX + TW / 2, y: TY + TH });
+                } else {
+                    pockets.push({ x: TX, y: TY + TH / 2 });
+                    pockets.push({ x: TX + TW, y: TY + TH / 2 });
+                }
+            }
+            if (n >= 8) {
+                /* Centers of the two remaining sides */
+                if (TW >= TH) {
+                    pockets.push({ x: TX, y: TY + TH / 2 });
+                    pockets.push({ x: TX + TW, y: TY + TH / 2 });
+                } else {
+                    pockets.push({ x: TX + TW / 2, y: TY });
+                    pockets.push({ x: TX + TW / 2, y: TY + TH });
+                }
+            }
         }
 
         /* ══════════════════════════════════════
          *  Game state
          * ══════════════════════════════════════ */
+        var ballColors = [];
         var balls = [];
         var shotCount = 0;
         var totalBalls = 0;
@@ -348,7 +367,7 @@
         /* ── Ball init ── */
         function initBalls() {
             balls = [];
-            var n = cfg.balls;
+            var n = getBallCount();
             totalBalls = n;
             pottedCount = 0;
 
@@ -398,6 +417,7 @@
         function resetGame() {
             readSlidersIntoCfg();
             recomputeLayout();
+            ballColors = generateBallColors(getBallCount());
             initBalls();
             shotCount = 0;
             gameOver = false;
@@ -582,61 +602,31 @@
         }
 
         function drawBall(b) {
-            var color = BALL_COLORS[b.id] || '#888';
-
             ctx.beginPath();
             ctx.arc(b.x, b.y, ballR, 0, Math.PI * 2);
 
             if (b.id === 0) {
-                /* Cue ball */
-                ctx.fillStyle = '#fff';
+                /* Cue ball: white with subtle glow */
+                var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                ctx.fillStyle = isDark ? '#ddd' : '#fff';
                 ctx.fill();
-                ctx.strokeStyle = '#aaa';
+                ctx.strokeStyle = isDark ? '#888' : '#aaa';
                 ctx.lineWidth = 1.2;
                 ctx.stroke();
                 return;
             }
 
-            if (b.id >= 9) {
-                /* Stripe: white base + colored band */
-                ctx.fillStyle = '#fff';
-                ctx.fill();
-                ctx.save();
-                ctx.beginPath();
-                ctx.rect(b.x - ballR, b.y - ballR * 0.45, ballR * 2, ballR * 0.9);
-                ctx.clip();
-                ctx.beginPath();
-                ctx.arc(b.x, b.y, ballR, 0, Math.PI * 2);
-                ctx.fillStyle = color;
-                ctx.fill();
-                ctx.restore();
-                ctx.beginPath();
-                ctx.arc(b.x, b.y, ballR, 0, Math.PI * 2);
-                ctx.strokeStyle = 'rgba(0,0,0,0.4)';
-                ctx.lineWidth = 0.8;
-                ctx.stroke();
-            } else {
-                /* Solid */
-                ctx.fillStyle = color;
-                ctx.fill();
-                ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-                ctx.lineWidth = 0.8;
-                ctx.stroke();
-            }
-
-            /* Number label */
-            var labelBg = (b.id >= 9) ? '#fff' : '#fff';
-            /* White circle behind number */
-            ctx.beginPath();
-            ctx.arc(b.x, b.y, ballR * 0.42, 0, Math.PI * 2);
-            ctx.fillStyle = '#fff';
+            /* Colored ball — retro-neon, solid, no label */
+            var color = ballColors[b.id - 1] || '#888';
+            ctx.fillStyle = color;
             ctx.fill();
-
-            ctx.fillStyle = '#222';
-            ctx.font = 'bold ' + Math.max(8, ballR * 0.85) + 'px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(String(b.id), b.x, b.y + 0.5);
+            /* Subtle glow effect (neon outline) */
+            ctx.shadowColor = color;
+            ctx.shadowBlur = ballR * 0.6;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
         }
 
         function drawAim() {
@@ -648,7 +638,7 @@
             var nx = dx / dist, ny = dy / dist;
 
             /* Aim line */
-            ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+            ctx.strokeStyle = getCSS('--color-muted');
             ctx.lineWidth = 1.5;
             ctx.setLineDash([6, 4]);
             ctx.beginPath();
@@ -659,8 +649,8 @@
 
             /* Cue stick */
             var stickLen = Math.min(dist * 0.6, Math.min(TW, TH) * 0.25);
-            ctx.strokeStyle = getCSS('--color-wood');
-            ctx.lineWidth = 5;
+            ctx.strokeStyle = getCSS('--color-fg');
+            ctx.lineWidth = 4;
             ctx.lineCap = 'round';
             ctx.beginPath();
             ctx.moveTo(cue.x - nx * (ballR + 3), cue.y - ny * (ballR + 3));
@@ -797,11 +787,11 @@
             panelOvl.classList.remove('open');
         });
 
-        /* Settings sliders: live label update */
+        /* Settings sliders: live label update + persist immediately */
         for (var k in sliders) {
             (function (key) {
                 sliders[key].addEventListener('input', function () {
-                    valEls[key].textContent = sliders[key].value;
+                    readSlidersIntoCfg();
                 });
             })(k);
         }
