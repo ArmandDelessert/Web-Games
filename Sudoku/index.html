@@ -350,6 +350,7 @@
             var n = config.n;
             containerEl.style.setProperty('--n', n);
             gridEl.style.gridTemplateColumns = 'repeat(' + n + ', 1fr)';
+            gridEl.style.gridTemplateRows = 'repeat(' + n + ', 1fr)';
             for (var i = 0; i < n * n; i++) {
                 var cell = document.createElement('div');
                 cell.className = 'cell';
