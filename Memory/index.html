@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Memory</title>
+    <meta name="description" content="Jeu de memory avec emojis, grille SVG">
+    <style>
+        :root {
+            --color-bg: #fafafa;
+            --color-fg: #1a1a1a;
+            --color-muted: #999;
+            --color-card-back: #e0e0e0;
+            --color-card-front: #ffffff;
+            --color-matched: #d4d4d4;
+            --color-selected: #c4c4c4;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --color-bg: #121212;
+                --color-fg: #e0e0e0;
+                --color-muted: #666;
+                --color-card-back: #2a2a2a;
+                --color-card-front: #1e1e1e;
+                --color-matched: #333;
+                --color-selected: #3a3a3a;
+            }
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                         "Helvetica Neue", Arial, sans-serif;
+            background: var(--color-bg);
+            color: var(--color-fg);
+            display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh;
+            padding: 0.5rem;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none; -webkit-user-select: none;
+        }
+
+        #game-container {
+            width: min(96vmin, 520px);
+            display: flex; flex-direction: column; align-items: center;
+        }
+
+        /* ── Header ── */
+        #header {
+            width: 100%; display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 0.6rem; font-size: 0.9rem;
+            font-variant-numeric: tabular-nums;
+        }
+        #btn-new {
+            background: none; border: 1px solid var(--color-muted);
+            color: var(--color-fg); border-radius: 4px;
+            padding: 0.2rem 0.7rem; cursor: pointer; font-size: 0.82rem;
+        }
+        #btn-new:hover { border-color: var(--color-fg); }
+
+        /* ── SVG grid ── */
+        #grid-wrapper { width: 100%; }
+        #grid {
+            width: 100%; height: auto; display: block;
+        }
+
+        /* ── Card SVG elements ── */
+        .card { cursor: pointer; }
+        .card.done { cursor: default; }
+        .card-bg {
+            rx: 6; ry: 6;
+            fill: var(--color-card-back);
+            stroke: var(--color-muted);
+            stroke-width: 1;
+            transition: fill 0.2s;
+        }
+        .card.done .card-bg { fill: var(--color-matched); stroke: var(--color-matched); }
+
+        .card-cover {
+            rx: 6; ry: 6;
+            fill: var(--color-fg);
+            opacity: 0.08;
+            pointer-events: none;
+            transition: opacity 0.22s;
+        }
+        .card.open .card-cover,
+        .card.done .card-cover { opacity: 0; }
+
+        .card-mark {
+            /* The "?" shown on face-down cards */
+            fill: var(--color-muted);
+            font-size: 28px;
+            dominant-baseline: middle;
+            text-anchor: middle;
+            pointer-events: none;
+            transition: opacity 0.22s;
+        }
+        .card.open .card-mark,
+        .card.done .card-mark { opacity: 0; }
+
+        .card-emoji {
+            font-size: 36px;
+            dominant-baseline: middle;
+            text-anchor: middle;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.22s;
+        }
+        .card.open .card-emoji,
+        .card.done .card-emoji { opacity: 1; }
+
+        /* ── Overlay ── */
+        #overlay {
+            position: fixed; inset: 0; z-index: 10;
+            background: var(--color-bg);
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            padding: 2rem;
+        }
+        #overlay.hidden { display: none; }
+
+        #overlay h1 { font-size: 1.6rem; margin-bottom: 0.3rem; }
+        #overlay .subtitle {
+            color: var(--color-muted); font-size: 0.9rem; margin-bottom: 2rem;
+        }
+
+        .grid-options {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 0.75rem; width: min(320px, 90vw);
+            margin-bottom: 1.5rem;
+        }
+        .grid-opt {
+            border: 1px solid var(--color-muted);
+            border-radius: 8px; padding: 0.8rem 0.5rem;
+            text-align: center; cursor: pointer;
+            transition: border-color 0.15s, background 0.15s;
+        }
+        .grid-opt:hover { border-color: var(--color-fg); }
+        .grid-opt.selected {
+            border-color: var(--color-fg);
+            border-width: 2px;
+            background: var(--color-card-back);
+        }
+        .grid-opt .pairs { font-size: 1.1rem; font-weight: 700; }
+        .grid-opt .dims { font-size: 0.78rem; color: var(--color-muted); margin-top: 0.2rem; }
+
+        #btn-start {
+            padding: 0.65rem 2.5rem;
+            background: var(--color-fg); color: var(--color-bg);
+            border: none; border-radius: 6px;
+            font-size: 1rem; cursor: pointer;
+        }
+
+        /* ── Win overlay ── */
+        #win-overlay {
+            display: none; position: fixed; inset: 0; z-index: 20;
+            background: rgba(0,0,0,0.35);
+            align-items: center; justify-content: center;
+        }
+        #win-overlay.open { display: flex; }
+        #win-box {
+            background: var(--color-bg); border: 2px solid var(--color-fg);
+            padding: 1.5rem 2.5rem; border-radius: 10px; text-align: center;
+            min-width: 220px;
+        }
+        #win-box h2 { margin-bottom: 0.4rem; }
+        #win-stats { color: var(--color-muted); font-size: 0.9rem; margin-bottom: 1rem; }
+        #btn-replay {
+            padding: 0.5rem 1.5rem; background: var(--color-fg); color: var(--color-bg);
+            border: none; border-radius: 6px; font-size: 0.95rem; cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="header">
+            <span id="moves-el">Coups : 0</span>
+            <span id="timer-el">00:00</span>
+            <button id="btn-new">Nouvelle partie</button>
+        </div>
+        <div id="grid-wrapper">
+            <svg id="grid"></svg>
+        </div>
+    </div>
+
+    <!-- Start overlay -->
+    <div id="overlay">
+        <h1>Memory</h1>
+        <p class="subtitle">Retournez les cartes par paires</p>
+        <div class="grid-options" id="grid-options"></div>
+        <button id="btn-start">Jouer</button>
+    </div>
+
+    <!-- Win overlay -->
+    <div id="win-overlay">
+        <div id="win-box">
+            <h2>Bravo !</h2>
+            <p id="win-stats"></p>
+            <button id="btn-replay">Rejouer</button>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        'use strict';
+
+        /* ── Emoji pool (18 unique — enough for 6×6) ── */
+        var EMOJIS = [
+            '🐶','🐱','🦊','🐻','🐼','🦁',
+            '🐸','🐧','🦉','🦋','🐝','🌸',
+            '🍎','🍋','🍇','🚀','⭐','🎸'
+        ];
+
+        /* ── Grid configurations ── */
+        var GRIDS = [
+            { cols: 4, rows: 2, label: '4 paires',  dims: '4 × 2' },
+            { cols: 4, rows: 4, label: '8 paires',  dims: '4 × 4' },
+            { cols: 6, rows: 4, label: '12 paires', dims: '6 × 4' },
+            { cols: 6, rows: 6, label: '18 paires', dims: '6 × 6' }
+        ];
+
+        /* Card geometry (SVG units) */
+        var CARD = 80, GAP = 8;
+
+        /* ── DOM ── */
+        var svg       = document.getElementById('grid');
+        var overlay   = document.getElementById('overlay');
+        var optsCont  = document.getElementById('grid-options');
+        var btnStart  = document.getElementById('btn-start');
+        var winOvl    = document.getElementById('win-overlay');
+        var winStats  = document.getElementById('win-stats');
+        var btnReplay = document.getElementById('btn-replay');
+        var btnNew    = document.getElementById('btn-new');
+        var movesEl   = document.getElementById('moves-el');
+        var timerEl   = document.getElementById('timer-el');
+
+        /* ── State ── */
+        var selectedGrid = 1;   /* index into GRIDS */
+        var cards = [];         /* {el, pairId, open, matched} */
+        var flipped = [];       /* up to 2 cards currently revealed */
+        var locked = false;     /* prevent clicks during mismatch delay */
+        var moves = 0;
+        var matchedPairs = 0;
+        var totalPairs = 0;
+        var timerStart = 0;
+        var timerId = 0;
+        var elapsed = 0;
+
+        /* ── Settings: build grid-size buttons ── */
+        GRIDS.forEach(function (g, i) {
+            var d = document.createElement('div');
+            d.className = 'grid-opt' + (i === selectedGrid ? ' selected' : '');
+            d.innerHTML = '<div class="pairs">' + g.label + '</div>'
+                        + '<div class="dims">' + g.dims + '</div>';
+            d.addEventListener('click', function () {
+                selectedGrid = i;
+                optsCont.querySelectorAll('.grid-opt').forEach(function (el, j) {
+                    el.classList.toggle('selected', j === i);
+                });
+            });
+            optsCont.appendChild(d);
+        });
+
+        /* ── Shuffle ── */
+        function shuffle(arr) {
+            for (var i = arr.length - 1; i > 0; i--) {
+                var j = Math.floor(Math.random() * (i + 1));
+                var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+            }
+            return arr;
+        }
+
+        /* ── Build SVG grid ── */
+        function buildGrid(gridCfg) {
+            var cols = gridCfg.cols, rows = gridCfg.rows;
+            var pairs = cols * rows / 2;
+            var vbW = cols * (CARD + GAP) + GAP;
+            var vbH = rows * (CARD + GAP) + GAP;
+            svg.setAttribute('viewBox', '0 0 ' + vbW + ' ' + vbH);
+
+            /* Pick emojis for this game */
+            var pool = EMOJIS.slice(0, pairs);
+            var deck = shuffle(pool.concat(pool));
+
+            svg.innerHTML = '';
+            cards = [];
+            totalPairs = pairs;
+            matchedPairs = 0;
+
+            deck.forEach(function (emoji, idx) {
+                var col = idx % cols;
+                var row = Math.floor(idx / cols);
+                var x = GAP + col * (CARD + GAP);
+                var y = GAP + row * (CARD + GAP);
+                var cx = x + CARD / 2;
+                var cy = y + CARD / 2;
+
+                var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                g.setAttribute('class', 'card');
+                g.setAttribute('data-idx', idx);
+
+                /* Background rect */
+                var bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                bg.setAttribute('class', 'card-bg');
+                bg.setAttribute('x', x); bg.setAttribute('y', y);
+                bg.setAttribute('width', CARD); bg.setAttribute('height', CARD);
+                g.appendChild(bg);
+
+                /* Cover (dark tint shown when face-down) */
+                var cover = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                cover.setAttribute('class', 'card-cover');
+                cover.setAttribute('x', x); cover.setAttribute('y', y);
+                cover.setAttribute('width', CARD); cover.setAttribute('height', CARD);
+                g.appendChild(cover);
+
+                /* Back mark (shown when face-down) */
+                var mark = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                mark.setAttribute('class', 'card-mark');
+                mark.setAttribute('x', cx); mark.setAttribute('y', cy);
+                mark.textContent = '✦';
+                g.appendChild(mark);
+
+                /* Emoji (shown when face-up) */
+                var txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                txt.setAttribute('class', 'card-emoji');
+                txt.setAttribute('x', cx); txt.setAttribute('y', cy);
+                txt.textContent = emoji;
+                g.appendChild(txt);
+
+                g.addEventListener('click', onCardClick);
+                svg.appendChild(g);
+
+                cards.push({ el: g, emoji: emoji, open: false, matched: false });
+            });
+        }
+
+        /* ── Click handler ── */
+        function onCardClick(e) {
+            if (locked) return;
+            var idx = parseInt(this.getAttribute('data-idx'), 10);
+            var card = cards[idx];
+            if (card.open || card.matched) return;
+
+            /* Start timer on first flip */
+            if (moves === 0 && flipped.length === 0) {
+                timerStart = Date.now();
+                timerId = setInterval(tickTimer, 500);
+            }
+
+            reveal(card);
+            flipped.push(card);
+
+            if (flipped.length === 2) {
+                moves++;
+                updateMoves();
+                if (flipped[0].emoji === flipped[1].emoji) {
+                    /* Match */
+                    flipped.forEach(function (c) {
+                        c.matched = true;
+                        c.el.classList.remove('open');
+                        c.el.classList.add('done');
+                    });
+                    flipped = [];
+                    matchedPairs++;
+                    if (matchedPairs === totalPairs) {
+                        clearInterval(timerId);
+                        setTimeout(showWin, 400);
+                    }
+                } else {
+                    /* Mismatch — flip back after delay */
+                    locked = true;
+                    setTimeout(function () {
+                        flipped.forEach(hide);
+                        flipped = [];
+                        locked = false;
+                    }, 900);
+                }
+            }
+        }
+
+        function reveal(card) {
+            card.open = true;
+            card.el.classList.add('open');
+        }
+
+        function hide(card) {
+            card.open = false;
+            card.el.classList.remove('open');
+        }
+
+        /* ── Timer ── */
+        function tickTimer() {
+            elapsed = Math.floor((Date.now() - timerStart) / 1000);
+            var m = Math.floor(elapsed / 60), s = elapsed % 60;
+            timerEl.textContent = pad(m) + ':' + pad(s);
+        }
+
+        function pad(n) { return n < 10 ? '0' + n : String(n); }
+
+        function updateMoves() {
+            movesEl.textContent = 'Coups : ' + moves;
+        }
+
+        /* ── Win ── */
+        function showWin() {
+            var m = Math.floor(elapsed / 60), s = elapsed % 60;
+            winStats.textContent = moves + ' coup' + (moves > 1 ? 's' : '')
+                + ' — ' + pad(m) + ':' + pad(s);
+            winOvl.classList.add('open');
+        }
+
+        /* ── Start / reset ── */
+        function startGame() {
+            clearInterval(timerId);
+            moves = 0; elapsed = 0;
+            flipped = []; locked = false;
+            updateMoves();
+            timerEl.textContent = '00:00';
+            winOvl.classList.remove('open');
+            buildGrid(GRIDS[selectedGrid]);
+        }
+
+        /* ── Event listeners ── */
+        btnStart.addEventListener('click', function () {
+            overlay.classList.add('hidden');
+            startGame();
+        });
+
+        btnReplay.addEventListener('click', function () {
+            winOvl.classList.remove('open');
+            overlay.classList.remove('hidden');
+        });
+
+        btnNew.addEventListener('click', function () {
+            clearInterval(timerId);
+            overlay.classList.remove('hidden');
+        });
+
+    })();
+    </script>
+</body>
+</html>
