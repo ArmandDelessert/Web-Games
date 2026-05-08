@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Sudoku</title>
-    <meta name="description" content="Jeu de Sudoku en style monochrome, grille 6×6 ou 9×9">
+    <meta name="description" content="Jeu de Sudoku en style monochrome, grille 6×6, 8×8 ou 9×9">
     <style>
         :root {
             --color-bg: #fafafa;
@@ -14,6 +14,7 @@
             --color-same: #dcdcdc;
             --color-selected: #c4c4c4;
             --color-error: #c33;
+            --color-guide: #4a90d9;
         }
 
         @media (prefers-color-scheme: dark) {
@@ -25,6 +26,7 @@
                 --color-same: #2a2a2a;
                 --color-selected: #3a3a3a;
                 --color-error: #e66;
+                --color-guide: #5ba0e8;
             }
         }
 
@@ -44,8 +46,8 @@
         #game-container {
             position: relative;
             display: flex; flex-direction: column; align-items: center;
-            width: min(92vmin, 500px);
-            --grid-w: min(92vmin, 500px);
+            width: min(92vmin, 500px, calc(100vw - 1rem));
+            --grid-w: min(92vmin, 500px, calc(100vw - 1rem));
             --n: 9;
         }
 
@@ -84,6 +86,7 @@
         .cell.given { font-weight: 700; }
         .cell.user { font-weight: 400; }
         .cell.error { color: var(--color-error); }
+        .cell.guide-valid { outline: 2px solid var(--color-guide); outline-offset: -2px; }
 
         #number-pad {
             display: grid;
@@ -123,6 +126,7 @@
             touch-action: manipulation;
         }
         .ctl-btn:active { background: var(--color-selected); }
+        .ctl-btn.active { background: var(--color-selected); border-color: var(--color-guide); color: var(--color-guide); }
 
         #overlay {
             position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
@@ -166,6 +170,7 @@
         <div id="number-pad"></div>
         <div id="controls">
             <button type="button" class="ctl-btn" id="btn-erase">Effacer</button>
+            <button type="button" class="ctl-btn" id="btn-guide">Guide</button>
             <button type="button" class="ctl-btn" id="btn-new">Nouvelle partie</button>
         </div>
         <div id="overlay">
@@ -178,8 +183,8 @@
                             <span>Grille</span>
                             <span class="setting-value" id="size-value">9 × 9</span>
                         </div>
-                        <input type="range" id="setting-size" min="0" max="1" step="1" value="1">
-                        <div class="setting-ticks"><span></span><span></span></div>
+                        <input type="range" id="setting-size" min="0" max="2" step="1" value="2">
+                        <div class="setting-ticks"><span></span><span></span><span></span></div>
                     </div>
                     <div class="setting-row">
                         <div class="setting-header">
@@ -200,22 +205,25 @@
         /* ── Config ── */
         var SIZE_CONFIGS = [
             { n: 6, boxR: 2, boxC: 3, label: '6 × 6' },
+            { n: 8, boxR: 2, boxC: 4, label: '8 × 8' },
             { n: 9, boxR: 3, boxC: 3, label: '9 × 9' }
         ];
         var DIFF_LABELS = ['Facile', 'Normale', 'Difficile'];
         // Proportion of cells kept as givens per [size][diff]
         var REVEAL_RATIO = {
             6: [0.60, 0.50, 0.40],
+            8: [0.55, 0.45, 0.36],
             9: [0.50, 0.42, 0.33]
         };
         var isTouchDevice = ('ontouchstart' in window);
 
         /* ── State ── */
-        var config = SIZE_CONFIGS[1];
+        var config = SIZE_CONFIGS[2];
         var solution = [];
         var puzzle = [];
         var userGrid = [];
         var selected = -1;
+        var guideActive = false;
         var gameStarted = false;
         var gameCompleted = false;
         var startTime = 0;
@@ -236,6 +244,7 @@
         var diffValueEl = document.getElementById('diff-value');
         var timerEl = document.getElementById('timer');
         var btnEraseEl = document.getElementById('btn-erase');
+        var btnGuideEl = document.getElementById('btn-guide');
         var btnNewEl = document.getElementById('btn-new');
 
         /* ── Sudoku generation ── */
@@ -428,7 +437,7 @@
                 var cell = cells[i];
                 var v = userGrid[i];
                 cell.textContent = v === 0 ? '' : v;
-                cell.classList.remove('selected', 'related', 'same-value', 'error', 'given', 'user');
+                cell.classList.remove('selected', 'related', 'same-value', 'error', 'given', 'user', 'guide-valid');
                 if (puzzle[i] !== 0) cell.classList.add('given');
                 else if (v !== 0) cell.classList.add('user');
                 if (errors[i]) cell.classList.add('error');
@@ -459,6 +468,17 @@
             for (var i = 0; i < padBtns.length; i++) {
                 var num = parseInt(padBtns[i].dataset.num, 10);
                 padBtns[i].classList.toggle('done', counts[num] >= n);
+            }
+
+            if (guideActive && selVal !== 0) {
+                for (var i = 0; i < n * n; i++) {
+                    if (userGrid[i] !== 0) continue;
+                    var r = Math.floor(i / n);
+                    var c = i % n;
+                    if (isValid(userGrid, n, config.boxR, config.boxC, r, c, selVal)) {
+                        cells[i].classList.add('guide-valid');
+                    }
+                }
             }
         }
 
@@ -611,6 +631,11 @@
         });
 
         btnEraseEl.addEventListener('click', eraseCell);
+        btnGuideEl.addEventListener('click', function () {
+            guideActive = !guideActive;
+            btnGuideEl.classList.toggle('active', guideActive);
+            renderCells();
+        });
         btnNewEl.addEventListener('click', showOverlayForNewGame);
 
         /* ── Keyboard controls ── */
