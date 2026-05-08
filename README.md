@@ -4,8 +4,8 @@ A [few games](https://armanddelessert.github.io/Games/) for [my personal website
 
 List of games:
 
-- [Billard](/Billard/index.html)
-- [Memory](/Memory/index.html)
-- [Snake](/Snake/index.html)
+- [Billard](/Web-Games/Billard/index.html)
+- [Memory](/Web-Games/Memory/index.html)
+- [Snake](/Web-Games/Snake/index.html)
 - [Yakazu](/Yakazu/index.html)
 - [ZooKeeper](/ZooKeeper/index.html)
