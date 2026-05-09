@@ -108,6 +108,7 @@
             touch-action: manipulation;
         }
         .num-btn:active { background: var(--color-selected); }
+        .num-btn.guide-valid { border-color: var(--color-guide); color: var(--color-guide); font-weight: 700; }
         .num-btn.done { opacity: 0.3; }
 
         #controls {
@@ -468,15 +469,27 @@
             for (var i = 0; i < padBtns.length; i++) {
                 var num = parseInt(padBtns[i].dataset.num, 10);
                 padBtns[i].classList.toggle('done', counts[num] >= n);
+                padBtns[i].classList.remove('guide-valid');
             }
 
-            if (guideActive && selVal !== 0) {
-                for (var i = 0; i < n * n; i++) {
-                    if (userGrid[i] !== 0) continue;
-                    var r = Math.floor(i / n);
-                    var c = i % n;
-                    if (isValid(userGrid, n, config.boxR, config.boxC, r, c, selVal)) {
-                        cells[i].classList.add('guide-valid');
+            if (guideActive && selected >= 0) {
+                if (selVal !== 0) {
+                    for (var i = 0; i < n * n; i++) {
+                        if (userGrid[i] !== 0) continue;
+                        var r = Math.floor(i / n);
+                        var c = i % n;
+                        if (isValid(userGrid, n, config.boxR, config.boxC, r, c, selVal)) {
+                            cells[i].classList.add('guide-valid');
+                        }
+                    }
+                } else {
+                    var sr = Math.floor(selected / n);
+                    var sc = selected % n;
+                    for (var i = 0; i < padBtns.length; i++) {
+                        var num = parseInt(padBtns[i].dataset.num, 10);
+                        if (isValid(userGrid, n, config.boxR, config.boxC, sr, sc, num)) {
+                            padBtns[i].classList.add('guide-valid');
+                        }
                     }
                 }
             }
