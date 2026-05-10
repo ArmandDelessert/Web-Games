@@ -201,6 +201,7 @@
         <div id="number-pad"></div>
         <div id="controls">
             <button type="button" class="ctl-btn" id="btn-erase">Effacer</button>
+            <button type="button" class="ctl-btn" id="btn-errors">Erreurs</button>
             <button type="button" class="ctl-btn" id="btn-guide">Guide</button>
             <button type="button" class="ctl-btn" id="btn-new">Nouvelle partie</button>
         </div>
@@ -255,6 +256,7 @@
         var userGrid = [];
         var selected = -1;
         var guideActive = false;
+        var showErrors = false;
         var maxSegLen = 1;
         var gameStarted = false;
         var gameCompleted = false;
@@ -276,6 +278,7 @@
         var diffValueEl = document.getElementById('diff-value');
         var timerEl = document.getElementById('timer');
         var btnEraseEl = document.getElementById('btn-erase');
+        var btnErrorsEl = document.getElementById('btn-errors');
         var btnGuideEl = document.getElementById('btn-guide');
         var btnNewEl = document.getElementById('btn-new');
 
@@ -724,7 +727,7 @@
 
                 if (puzzle[i] !== 0) cell.classList.add('given');
                 else if (v !== 0) cell.classList.add('user');
-                if (errors[i]) cell.classList.add('error');
+                if (showErrors && errors[i]) cell.classList.add('error');
 
                 if (selected >= 0) {
                     if (relatedSet[i]) cell.classList.add('related');
@@ -924,6 +927,11 @@
         });
 
         btnEraseEl.addEventListener('click', eraseCell);
+        btnErrorsEl.addEventListener('click', function () {
+            showErrors = !showErrors;
+            btnErrorsEl.classList.toggle('active', showErrors);
+            renderCells();
+        });
         btnGuideEl.addEventListener('click', function () {
             guideActive = !guideActive;
             btnGuideEl.classList.toggle('active', guideActive);
