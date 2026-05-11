@@ -42,7 +42,7 @@
         }
 
         #game-container {
-            width: min(96vmin, 520px);
+            width: min(96vmin, 520px, calc(100vw - 1rem));
             display: flex; flex-direction: column; align-items: center;
         }
 
@@ -58,6 +58,13 @@
             padding: 0.2rem 0.7rem; cursor: pointer; font-size: 0.82rem;
         }
         #btn-new:hover { border-color: var(--color-fg); }
+        #btn-seen {
+            background: none; border: 1px solid var(--color-muted);
+            color: var(--color-fg); border-radius: 4px;
+            padding: 0.2rem 0.7rem; cursor: pointer; font-size: 0.82rem;
+        }
+        #btn-seen:hover { border-color: var(--color-fg); }
+        #btn-seen.active { border-color: var(--color-fg); background: var(--color-selected); }
 
         /* ── SVG grid ── */
         #grid-wrapper { width: 100%; }
@@ -76,6 +83,7 @@
             transition: fill 0.2s;
         }
         .card.done .card-bg { fill: var(--color-matched); stroke: var(--color-matched); }
+        .card.seen .card-bg { stroke: var(--color-fg); stroke-width: 2; }
 
         .card-cover {
             rx: 6; ry: 6;
@@ -177,6 +185,7 @@
         <div id="header">
             <span id="moves-el">Coups : 0</span>
             <span id="timer-el">00:00</span>
+            <button id="btn-seen">Vues</button>
             <button id="btn-new">Nouvelle partie</button>
         </div>
         <div id="grid-wrapper">
@@ -232,12 +241,14 @@
         var winStats  = document.getElementById('win-stats');
         var btnReplay = document.getElementById('btn-replay');
         var btnNew    = document.getElementById('btn-new');
+        var btnSeen   = document.getElementById('btn-seen');
         var movesEl   = document.getElementById('moves-el');
         var timerEl   = document.getElementById('timer-el');
 
         /* ── State ── */
         var selectedGrid = 1;   /* index into GRIDS */
-        var cards = [];         /* {el, pairId, open, matched} */
+        var cards = [];         /* {el, emoji, open, matched, seen} */
+        var showSeen = false;
         var flipped = [];       /* up to 2 cards currently revealed */
         var locked = false;     /* prevent clicks during mismatch delay */
         var moves = 0;
@@ -331,7 +342,7 @@
                 g.addEventListener('click', onCardClick);
                 svg.appendChild(g);
 
-                cards.push({ el: g, emoji: emoji, open: false, matched: false });
+                cards.push({ el: g, emoji: emoji, open: false, matched: false, seen: false });
             });
         }
 
@@ -350,6 +361,7 @@
 
             reveal(card);
             flipped.push(card);
+            updateSeenDisplay();
 
             if (flipped.length === 2) {
                 moves++;
@@ -358,7 +370,7 @@
                     /* Match */
                     flipped.forEach(function (c) {
                         c.matched = true;
-                        c.el.classList.remove('open');
+                        c.el.classList.remove('open', 'seen');
                         c.el.classList.add('done');
                     });
                     flipped = [];
@@ -374,6 +386,7 @@
                         flipped.forEach(hide);
                         flipped = [];
                         locked = false;
+                        updateSeenDisplay();
                     }, 900);
                 }
             }
@@ -381,7 +394,18 @@
 
         function reveal(card) {
             card.open = true;
+            card.seen = true;
             card.el.classList.add('open');
+        }
+
+        function updateSeenDisplay() {
+            cards.forEach(function (c) {
+                if (!c.matched && !c.open) {
+                    c.el.classList.toggle('seen', showSeen && c.seen);
+                } else {
+                    c.el.classList.remove('seen');
+                }
+            });
         }
 
         function hide(card) {
@@ -425,6 +449,12 @@
         btnStart.addEventListener('click', function () {
             overlay.classList.add('hidden');
             startGame();
+        });
+
+        btnSeen.addEventListener('click', function () {
+            showSeen = !showSeen;
+            btnSeen.classList.toggle('active', showSeen);
+            updateSeenDisplay();
         });
 
         btnReplay.addEventListener('click', function () {
