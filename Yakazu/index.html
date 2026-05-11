@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Yakazu</title>
+    <meta name="description" content="Yakazu — Jeu de logique en style monochrome, grille 5×5 / 7×7 / 9×9">
+    <style>
+        :root {
+            --color-bg: #fafafa;
+            --color-fg: #1a1a1a;
+            --color-muted: #999;
+            --color-related: #ececec;
+            --color-same: #dcdcdc;
+            --color-selected: #c4c4c4;
+            --color-error: #c33;
+            --color-guide: #4a90d9;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --color-bg: #121212;
+                --color-fg: #e0e0e0;
+                --color-muted: #666;
+                --color-related: #1e1e1e;
+                --color-same: #2a2a2a;
+                --color-selected: #3a3a3a;
+                --color-error: #e66;
+                --color-guide: #5ba0e8;
+            }
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                         "Helvetica Neue", Arial, sans-serif;
+            background: var(--color-bg);
+            color: var(--color-fg);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 100vh;
+            padding: 0.5rem;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        #game-container {
+            position: relative;
+            display: flex; flex-direction: column; align-items: center;
+            width: min(92vmin, 500px, calc(100vw - 1rem));
+            --grid-w: min(92vmin, 500px, calc(100vw - 1rem));
+            --n: 7;
+            --pad-n: 7;
+        }
+
+        #timer {
+            font-size: 1.1rem;
+            font-variant-numeric: tabular-nums;
+            margin-bottom: 0.6rem;
+            min-height: 1.2em;
+        }
+
+        #grid {
+            display: grid;
+            gap: 1px;
+            width: 100%;
+            aspect-ratio: 1;
+            background: var(--color-muted);
+            border: 2px solid var(--color-fg);
+            user-select: none; -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        .cell {
+            position: relative;
+            display: flex; align-items: center; justify-content: center;
+            font-size: calc(var(--grid-w) * 0.55 / var(--n));
+            font-variant-numeric: tabular-nums;
+            background: var(--color-bg);
+            color: var(--color-fg);
+            transition: background-color 0.08s linear;
+            overflow: hidden;
+        }
+        .cell.black {
+            background: var(--color-fg);
+            cursor: default;
+        }
+        .cell.white {
+            cursor: pointer;
+        }
+        .cell.white.related { background: var(--color-related); }
+        .cell.white.same-value { background: var(--color-same); }
+        .cell.white.selected { background: var(--color-selected); }
+        .cell.white.given { font-weight: 700; }
+        .cell.white.user { font-weight: 400; }
+        .cell.white.error { color: var(--color-error); }
+        .cell.white.guide-valid { outline: 2px solid var(--color-guide); outline-offset: -2px; }
+
+        /* Segment length indicators (top-left: horizontal, bottom-right: vertical) */
+        .cell[data-h-len]::before {
+            content: attr(data-h-len);
+            position: absolute;
+            top: 1px;
+            left: 3px;
+            font-size: calc(var(--grid-w) * 0.16 / var(--n));
+            color: var(--color-muted);
+            line-height: 1;
+            font-weight: 400;
+            pointer-events: none;
+        }
+        .cell[data-v-len]::after {
+            content: attr(data-v-len);
+            position: absolute;
+            bottom: 1px;
+            right: 3px;
+            font-size: calc(var(--grid-w) * 0.16 / var(--n));
+            color: var(--color-muted);
+            line-height: 1;
+            font-weight: 400;
+            pointer-events: none;
+        }
+
+        #number-pad {
+            display: grid;
+            gap: 0.35rem;
+            width: 100%;
+            margin-top: 0.75rem;
+        }
+        .num-btn {
+            aspect-ratio: 1;
+            display: flex; align-items: center; justify-content: center;
+            background: var(--color-bg);
+            color: var(--color-fg);
+            border: 1px solid var(--color-fg);
+            font-family: inherit;
+            font-size: calc(var(--grid-w) * 0.42 / var(--pad-n));
+            font-weight: 500;
+            cursor: pointer;
+            padding: 0;
+            touch-action: manipulation;
+        }
+        .num-btn:active { background: var(--color-selected); }
+        .num-btn.guide-valid { border-color: var(--color-guide); color: var(--color-guide); font-weight: 700; }
+
+        #controls {
+            display: flex; justify-content: center; gap: 0.5rem;
+            width: 100%; margin-top: 0.6rem;
+        }
+        .ctl-btn {
+            flex: 1;
+            background: var(--color-bg);
+            color: var(--color-fg);
+            border: 1px solid var(--color-fg);
+            font-family: inherit;
+            font-size: 0.9rem;
+            padding: 0.5rem 0.8rem;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+        .ctl-btn:active { background: var(--color-selected); }
+        .ctl-btn.active { background: var(--color-selected); border-color: var(--color-guide); color: var(--color-guide); }
+
+        #overlay {
+            position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+            background: var(--color-bg); opacity: 0.96; text-align: center; z-index: 10;
+        }
+        #overlay.hidden { display: none; }
+        #overlay-text { padding: 0 1rem; }
+        #overlay-text p { margin-bottom: 0.5rem; }
+        #overlay-title { font-size: 1.6rem; font-weight: 700; }
+        #final-time { font-size: 1rem; color: var(--color-muted); min-height: 1.4em; }
+        #start-hint { font-size: 0.85rem; color: var(--color-muted); }
+
+        #settings { display: flex; flex-direction: column; gap: 0.9rem; margin: 1rem auto; width: 240px; }
+        .setting-row { display: flex; flex-direction: column; gap: 0.25rem; }
+        .setting-header { display: flex; justify-content: space-between; font-size: 0.9rem; }
+        .setting-value { font-variant-numeric: tabular-nums; }
+        input[type="range"] {
+            -webkit-appearance: none; appearance: none; width: 100%; height: 6px;
+            background: var(--color-muted); border-radius: 3px; outline: none; cursor: pointer;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none; width: 16px; height: 16px;
+            background: var(--color-fg); border-radius: 50%; cursor: pointer;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 16px; height: 16px; background: var(--color-fg); border: none;
+            border-radius: 50%; cursor: pointer;
+        }
+        .setting-ticks { display: flex; justify-content: space-between; padding: 0 7px; margin-top: 2px; }
+        .setting-ticks span { width: 1px; height: 6px; background: var(--color-muted); }
+
+        @media (max-width: 380px) {
+            .ctl-btn { font-size: 0.8rem; padding: 0.4rem 0.5rem; }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <p id="timer">00:00</p>
+        <div id="grid"></div>
+        <div id="number-pad"></div>
+        <div id="controls">
+            <button type="button" class="ctl-btn" id="btn-erase">Effacer</button>
+            <button type="button" class="ctl-btn" id="btn-errors">Erreurs</button>
+            <button type="button" class="ctl-btn" id="btn-guide">Guide</button>
+            <button type="button" class="ctl-btn" id="btn-new">Nouvelle partie</button>
+        </div>
+        <div id="overlay">
+            <div id="overlay-text">
+                <p id="overlay-title">Yakazu</p>
+                <p id="final-time"></p>
+                <div id="settings">
+                    <div class="setting-row">
+                        <div class="setting-header">
+                            <span>Grille</span>
+                            <span class="setting-value" id="size-value">7 × 7</span>
+                        </div>
+                        <input type="range" id="setting-size" min="0" max="2" step="1" value="1">
+                        <div class="setting-ticks"><span></span><span></span><span></span></div>
+                    </div>
+                    <div class="setting-row">
+                        <div class="setting-header">
+                            <span>Difficulté</span>
+                            <span class="setting-value" id="diff-value">Normale</span>
+                        </div>
+                        <input type="range" id="setting-diff" min="0" max="2" step="1" value="1">
+                        <div class="setting-ticks"><span></span><span></span><span></span></div>
+                    </div>
+                </div>
+                <p id="start-hint">Appuyer sur « Espace » pour jouer</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        /* ── Config ── */
+        var SIZE_CONFIGS = [
+            { n: 5, label: '5 × 5' },
+            { n: 7, label: '7 × 7' },
+            { n: 9, label: '9 × 9' }
+        ];
+        var DIFF_LABELS = ['Facile', 'Normale', 'Difficile'];
+        // Fraction of white cells kept as pre-filled clues per difficulty level
+        // (Difficile = 0: remove as many as possible while keeping a unique solution)
+        var GIVEN_RATIO = [0.55, 0.35, 0.0];
+        var BLACK_DENSITY = 0.26;
+        var isTouchDevice = ('ontouchstart' in window);
+
+        /* ── State ── */
+        var config = SIZE_CONFIGS[1];
+        var blackCells = [];
+        var segData = null;
+        var solution = [];
+        var puzzle = [];
+        var userGrid = [];
+        var selected = -1;
+        var guideActive = false;
+        var showErrors = false;
+        var maxSegLen = 1;
+        var gameStarted = false;
+        var gameCompleted = false;
+        var startTime = 0;
+        var elapsedBeforePause = 0;
+        var timerId = 0;
+
+        /* ── DOM ── */
+        var containerEl = document.getElementById('game-container');
+        var gridEl = document.getElementById('grid');
+        var padEl = document.getElementById('number-pad');
+        var overlayEl = document.getElementById('overlay');
+        var overlayTitleEl = document.getElementById('overlay-title');
+        var finalTimeEl = document.getElementById('final-time');
+        var startHintEl = document.getElementById('start-hint');
+        var settingSizeEl = document.getElementById('setting-size');
+        var settingDiffEl = document.getElementById('setting-diff');
+        var sizeValueEl = document.getElementById('size-value');
+        var diffValueEl = document.getElementById('diff-value');
+        var timerEl = document.getElementById('timer');
+        var btnEraseEl = document.getElementById('btn-erase');
+        var btnErrorsEl = document.getElementById('btn-errors');
+        var btnGuideEl = document.getElementById('btn-guide');
+        var btnNewEl = document.getElementById('btn-new');
+
+        /* ── Utilities ── */
+        function shuffle(arr) {
+            for (var i = arr.length - 1; i > 0; i--) {
+                var j = Math.floor(Math.random() * (i + 1));
+                var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+            }
+            return arr;
+        }
+
+        /* ── Segment computation ──
+         * A segment is a maximal run of consecutive white cells on a row
+         * (dir = 'h') or column (dir = 'v'). Each white cell belongs to
+         * exactly one horizontal segment and one vertical segment.
+         */
+        function buildSegments(black, n) {
+            var segments = [];
+            var cellRowSeg = new Array(n * n).fill(-1);
+            var cellColSeg = new Array(n * n).fill(-1);
+
+            // Horizontal segments (scan row by row)
+            for (var r = 0; r < n; r++) {
+                var c = 0;
+                while (c < n) {
+                    if (black[r * n + c]) { c++; continue; }
+                    var cells = [];
+                    while (c < n && !black[r * n + c]) {
+                        var idx = r * n + c;
+                        cells.push(idx);
+                        cellRowSeg[idx] = segments.length;
+                        c++;
+                    }
+                    segments.push({ cells: cells, len: cells.length, dir: 'h' });
+                }
+            }
+
+            // Vertical segments (scan column by column)
+            for (var c = 0; c < n; c++) {
+                var r = 0;
+                while (r < n) {
+                    if (black[r * n + c]) { r++; continue; }
+                    var cells = [];
+                    while (r < n && !black[r * n + c]) {
+                        var idx = r * n + c;
+                        cells.push(idx);
+                        cellColSeg[idx] = segments.length;
+                        r++;
+                    }
+                    segments.push({ cells: cells, len: cells.length, dir: 'v' });
+                }
+            }
+
+            return { segments: segments, cellRowSeg: cellRowSeg, cellColSeg: cellColSeg };
+        }
+
+        /* ── Solver with incremental segment bitmasks ──
+         * Each segment carries a bitmask of digits already placed (bit v is
+         * set when value v is used in the segment). Candidates for a cell are
+         * the values in {1..maxVal} that are NOT set in rowMask | colMask.
+         * A segment of length L >= 2 imposes values in {1..L} with no
+         * duplicates; a segment of length 1 imposes no constraint on its axis.
+         */
+        function initSolveState(grid, n) {
+            var segs = segData.segments;
+            var segMasks = new Int32Array(segs.length);
+            for (var i = 0; i < n * n; i++) {
+                var v = grid[i];
+                if (v > 0) {
+                    segMasks[segData.cellRowSeg[i]] |= (1 << v);
+                    segMasks[segData.cellColSeg[i]] |= (1 << v);
+                }
+            }
+            return segMasks;
+        }
+
+        function cellMaxVal(idx) {
+            var rowLen = segData.segments[segData.cellRowSeg[idx]].len;
+            var colLen = segData.segments[segData.cellColSeg[idx]].len;
+            if (rowLen >= 2 && colLen >= 2) return rowLen < colLen ? rowLen : colLen;
+            if (rowLen >= 2) return rowLen;
+            if (colLen >= 2) return colLen;
+            return 9; // unreachable: generator forbids L=1/L=1
+        }
+
+        /* ── Backtracking solver with randomisation (for generation) ──
+         * Uses MRV cell selection for quick rejection of unsolvable
+         * patterns and a step budget to bail out early if a pattern is
+         * too hard.
+         */
+        var solveBudget = 0;
+        function solveRandom(grid, n, budget) {
+            var segMasks = initSolveState(grid, n);
+            solveBudget = budget || 50000;
+            var r = solveRandomRec(grid, n, segMasks);
+            return r === 1;
+        }
+
+        // Returns: 1 = solved, 0 = dead end, -1 = budget exhausted
+        function solveRandomRec(grid, n, segMasks) {
+            if (--solveBudget <= 0) return -1;
+            var bestIdx = -1;
+            var bestCount = 999;
+            var bestMaxVal = 0;
+            var bestUsedMask = 0;
+            for (var i = 0; i < n * n; i++) {
+                if (blackCells[i] || grid[i] !== 0) continue;
+                var rs = segData.cellRowSeg[i];
+                var cs = segData.cellColSeg[i];
+                var maxVal = cellMaxVal(i);
+                var usedMask = segMasks[rs] | segMasks[cs];
+                var cnt = 0;
+                for (var v = 1; v <= maxVal; v++) {
+                    if (!(usedMask & (1 << v))) cnt++;
+                }
+                if (cnt === 0) return 0;
+                if (cnt < bestCount) {
+                    bestIdx = i;
+                    bestCount = cnt;
+                    bestMaxVal = maxVal;
+                    bestUsedMask = usedMask;
+                    if (cnt === 1) break;
+                }
+            }
+            if (bestIdx === -1) return 1;
+            var brs = segData.cellRowSeg[bestIdx];
+            var bcs = segData.cellColSeg[bestIdx];
+            var cands = [];
+            for (var val = 1; val <= bestMaxVal; val++) {
+                if (!(bestUsedMask & (1 << val))) cands.push(val);
+            }
+            shuffle(cands);
+            for (var k = 0; k < cands.length; k++) {
+                var v2 = cands[k];
+                var bit = 1 << v2;
+                grid[bestIdx] = v2;
+                segMasks[brs] |= bit;
+                segMasks[bcs] |= bit;
+                var sub = solveRandomRec(grid, n, segMasks);
+                if (sub === 1) return 1;
+                if (sub === -1) return -1;
+                grid[bestIdx] = 0;
+                segMasks[brs] &= ~bit;
+                segMasks[bcs] &= ~bit;
+            }
+            return 0;
+        }
+
+        /* ── Count solutions up to `limit` (MRV heuristic for uniqueness check) ── */
+        function countSolutions(grid, n, limit) {
+            var segMasks = initSolveState(grid, n);
+            return countSolutionsRec(grid, n, segMasks, limit);
+        }
+
+        function countSolutionsRec(grid, n, segMasks, limit) {
+            var bestIdx = -1;
+            var bestCount = 999;
+            var bestMaxVal = 0;
+            var bestUsedMask = 0;
+            for (var i = 0; i < n * n; i++) {
+                if (blackCells[i] || grid[i] !== 0) continue;
+                var rs = segData.cellRowSeg[i];
+                var cs = segData.cellColSeg[i];
+                var maxVal = cellMaxVal(i);
+                var usedMask = segMasks[rs] | segMasks[cs];
+                // Popcount of unused bits in {1..maxVal}
+                var cnt = 0;
+                for (var v = 1; v <= maxVal; v++) {
+                    if (!(usedMask & (1 << v))) cnt++;
+                }
+                if (cnt === 0) return 0;
+                if (cnt < bestCount) {
+                    bestIdx = i;
+                    bestCount = cnt;
+                    bestMaxVal = maxVal;
+                    bestUsedMask = usedMask;
+                    if (cnt === 1) break;
+                }
+            }
+            if (bestIdx === -1) return 1;
+            var brs = segData.cellRowSeg[bestIdx];
+            var bcs = segData.cellColSeg[bestIdx];
+            var count = 0;
+            for (var val = 1; val <= bestMaxVal; val++) {
+                var bit = 1 << val;
+                if (bestUsedMask & bit) continue;
+                grid[bestIdx] = val;
+                segMasks[brs] |= bit;
+                segMasks[bcs] |= bit;
+                count += countSolutionsRec(grid, n, segMasks, limit - count);
+                grid[bestIdx] = 0;
+                segMasks[brs] &= ~bit;
+                segMasks[bcs] &= ~bit;
+                if (count >= limit) return count;
+            }
+            return count;
+        }
+
+        /* ── Black cell pattern generation ──
+         * Places black cells pairwise with 180° rotational symmetry and
+         * rejects any placement that would create a white cell isolated on
+         * both axes (segment of length 1 horizontally AND vertically).
+         */
+        function hasIsolatedWhite(black, n) {
+            for (var r = 0; r < n; r++) {
+                for (var c = 0; c < n; c++) {
+                    if (black[r * n + c]) continue;
+                    // Horizontal length
+                    var hLen = 1;
+                    var cc = c - 1;
+                    while (cc >= 0 && !black[r * n + cc]) { hLen++; cc--; }
+                    cc = c + 1;
+                    while (cc < n && !black[r * n + cc]) { hLen++; cc++; }
+                    if (hLen > 1) continue;
+                    // Vertical length
+                    var vLen = 1;
+                    var rr = r - 1;
+                    while (rr >= 0 && !black[rr * n + c]) { vLen++; rr--; }
+                    rr = r + 1;
+                    while (rr < n && !black[rr * n + c]) { vLen++; rr++; }
+                    if (vLen <= 1) return true;
+                }
+            }
+            return false;
+        }
+
+        function generateBlackPattern(n) {
+            var target = Math.round(n * n * BLACK_DENSITY);
+            var black = new Array(n * n).fill(false);
+
+            var pairs = [];
+            var centerIdx = -1;
+            for (var r = 0; r < n; r++) {
+                for (var c = 0; c < n; c++) {
+                    var idx = r * n + c;
+                    var symIdx = (n - 1 - r) * n + (n - 1 - c);
+                    if (idx < symIdx) pairs.push([idx, symIdx]);
+                    else if (idx === symIdx) centerIdx = idx;
+                }
+            }
+            shuffle(pairs);
+
+            var placed = 0;
+            for (var i = 0; i < pairs.length && placed < target; i++) {
+                black[pairs[i][0]] = true;
+                black[pairs[i][1]] = true;
+                if (hasIsolatedWhite(black, n)) {
+                    black[pairs[i][0]] = false;
+                    black[pairs[i][1]] = false;
+                } else {
+                    placed += 2;
+                }
+            }
+
+            if (centerIdx >= 0 && placed < target) {
+                black[centerIdx] = true;
+                if (hasIsolatedWhite(black, n)) {
+                    black[centerIdx] = false;
+                }
+            }
+
+            return black;
+        }
+
+        /* ── Puzzle generation: remove clues while preserving uniqueness ── */
+        function createPuzzle(sol, diffIdx) {
+            var n = config.n;
+            var puz = sol.slice();
+            var whiteIdxs = [];
+            for (var i = 0; i < n * n; i++) {
+                if (!blackCells[i]) whiteIdxs.push(i);
+            }
+            shuffle(whiteIdxs);
+
+            var targetGivens = Math.max(0, Math.round(whiteIdxs.length * GIVEN_RATIO[diffIdx]));
+            var currentGivens = whiteIdxs.length;
+            var genStart = Date.now();
+
+            for (var i = 0; i < whiteIdxs.length; i++) {
+                if (currentGivens <= targetGivens) break;
+                if (Date.now() - genStart > 3000) break; // safety budget
+
+                var idx = whiteIdxs[i];
+                var backup = puz[idx];
+                puz[idx] = 0;
+                var test = puz.slice();
+                if (countSolutions(test, n, 2) === 1) {
+                    currentGivens--;
+                } else {
+                    puz[idx] = backup;
+                }
+            }
+
+            return puz;
+        }
+
+        function newGame() {
+            var sizeIdx = parseInt(settingSizeEl.value, 10);
+            var diffIdx = parseInt(settingDiffEl.value, 10);
+            config = SIZE_CONFIGS[sizeIdx];
+            var n = config.n;
+
+            // Retry until the black pattern yields a solvable grid.
+            // Most random patterns are unsolvable (contradictory constraints),
+            // but the step-budgeted solver rejects them in milliseconds.
+            for (var attempt = 0; attempt < 500; attempt++) {
+                blackCells = generateBlackPattern(n);
+                segData = buildSegments(blackCells, n);
+                var grid = new Array(n * n).fill(0);
+                if (solveRandom(grid, n, 20000)) {
+                    solution = grid;
+                    puzzle = createPuzzle(grid, diffIdx);
+                    userGrid = puzzle.slice();
+                    selected = -1;
+                    gameCompleted = false;
+                    elapsedBeforePause = 0;
+                    timerEl.textContent = '00:00';
+
+                    maxSegLen = 1;
+                    for (var s = 0; s < segData.segments.length; s++) {
+                        if (segData.segments[s].len > maxSegLen) maxSegLen = segData.segments[s].len;
+                    }
+
+                    buildGrid();
+                    buildPad();
+                    renderCells();
+                    return;
+                }
+            }
+        }
+
+        /* ── UI building ── */
+        function buildGrid() {
+            gridEl.innerHTML = '';
+            var n = config.n;
+            containerEl.style.setProperty('--n', n);
+            gridEl.style.gridTemplateColumns = 'repeat(' + n + ', 1fr)';
+            gridEl.style.gridTemplateRows = 'repeat(' + n + ', 1fr)';
+
+            for (var i = 0; i < n * n; i++) {
+                var cell = document.createElement('div');
+                cell.className = 'cell';
+                if (blackCells[i]) {
+                    cell.classList.add('black');
+                } else {
+                    cell.classList.add('white');
+                    (function (idx) {
+                        cell.addEventListener('click', function () { selectCell(idx); });
+                    })(i);
+                }
+                gridEl.appendChild(cell);
+            }
+
+            // Segment length indicators on the first cell of each segment (L >= 2)
+            for (var s = 0; s < segData.segments.length; s++) {
+                var seg = segData.segments[s];
+                if (seg.len < 2) continue;
+                var firstIdx = seg.cells[0];
+                var cellEl = gridEl.children[firstIdx];
+                if (seg.dir === 'h') {
+                    cellEl.setAttribute('data-h-len', seg.len);
+                } else {
+                    cellEl.setAttribute('data-v-len', seg.len);
+                }
+            }
+        }
+
+        function buildPad() {
+            padEl.innerHTML = '';
+            containerEl.style.setProperty('--pad-n', maxSegLen);
+            padEl.style.gridTemplateColumns = 'repeat(' + maxSegLen + ', 1fr)';
+            for (var i = 1; i <= maxSegLen; i++) {
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'num-btn';
+                btn.textContent = i;
+                btn.dataset.num = i;
+                (function (num) {
+                    btn.addEventListener('click', function () { inputNumber(num); });
+                })(i);
+                padEl.appendChild(btn);
+            }
+        }
+
+        /* ── Real-time validation ──
+         * A cell is in error if any segment it belongs to (L >= 2) contains
+         * an out-of-range value or a duplicate.
+         */
+        function findConflicts() {
+            var n = config.n;
+            var errors = new Array(n * n).fill(false);
+            for (var s = 0; s < segData.segments.length; s++) {
+                var seg = segData.segments[s];
+                if (seg.len < 2) continue;
+
+                // Out-of-range values
+                for (var j = 0; j < seg.cells.length; j++) {
+                    var idx = seg.cells[j];
+                    var v = userGrid[idx];
+                    if (v !== 0 && (v < 1 || v > seg.len)) {
+                        errors[idx] = true;
+                    }
+                }
+
+                // Duplicates within the segment
+                var seen = {};
+                for (var j = 0; j < seg.cells.length; j++) {
+                    var idx = seg.cells[j];
+                    var v = userGrid[idx];
+                    if (v === 0) continue;
+                    if (seen[v] !== undefined) {
+                        errors[idx] = true;
+                        errors[seen[v]] = true;
+                    } else {
+                        seen[v] = idx;
+                    }
+                }
+            }
+            return errors;
+        }
+
+        /* ── Rendering ── */
+        function renderCells() {
+            var n = config.n;
+            var cells = gridEl.children;
+            var errors = findConflicts();
+            var relatedSet = {};
+            var selVal = 0;
+
+            if (selected >= 0 && !blackCells[selected]) {
+                selVal = userGrid[selected];
+                var rSeg = segData.segments[segData.cellRowSeg[selected]];
+                var cSeg = segData.segments[segData.cellColSeg[selected]];
+                for (var j = 0; j < rSeg.cells.length; j++) relatedSet[rSeg.cells[j]] = true;
+                for (var j = 0; j < cSeg.cells.length; j++) relatedSet[cSeg.cells[j]] = true;
+            }
+
+            for (var i = 0; i < n * n; i++) {
+                var cell = cells[i];
+                if (blackCells[i]) continue;
+
+                var v = userGrid[i];
+                cell.textContent = v === 0 ? '' : v;
+                cell.classList.remove('selected', 'related', 'same-value', 'error', 'given', 'user', 'guide-valid');
+
+                if (puzzle[i] !== 0) cell.classList.add('given');
+                else if (v !== 0) cell.classList.add('user');
+                if (showErrors && errors[i]) cell.classList.add('error');
+
+                if (selected >= 0) {
+                    if (relatedSet[i]) cell.classList.add('related');
+                    if (selVal !== 0 && v === selVal) cell.classList.add('same-value');
+                    if (i === selected) cell.classList.add('selected');
+                }
+            }
+
+            var padBtns = padEl.children;
+            for (var i = 0; i < padBtns.length; i++) {
+                padBtns[i].classList.remove('guide-valid');
+            }
+
+            if (guideActive && selected >= 0 && !blackCells[selected]) {
+                var rs = segData.cellRowSeg[selected];
+                var cs = segData.cellColSeg[selected];
+                var mv = cellMaxVal(selected);
+                var usedMask = 0;
+                var rSeg = segData.segments[rs];
+                var cSeg = segData.segments[cs];
+                for (var j = 0; j < rSeg.cells.length; j++) {
+                    var v = userGrid[rSeg.cells[j]];
+                    if (v > 0) usedMask |= (1 << v);
+                }
+                for (var j = 0; j < cSeg.cells.length; j++) {
+                    var v = userGrid[cSeg.cells[j]];
+                    if (v > 0) usedMask |= (1 << v);
+                }
+
+                if (selVal !== 0) {
+                    for (var i = 0; i < n * n; i++) {
+                        if (blackCells[i] || userGrid[i] !== 0) continue;
+                        var iRs = segData.cellRowSeg[i];
+                        var iCs = segData.cellColSeg[i];
+                        var iMv = cellMaxVal(i);
+                        if (selVal > iMv) continue;
+                        var iMask = 0;
+                        var iRSeg = segData.segments[iRs];
+                        var iCSeg = segData.segments[iCs];
+                        for (var j = 0; j < iRSeg.cells.length; j++) {
+                            var vv = userGrid[iRSeg.cells[j]];
+                            if (vv > 0) iMask |= (1 << vv);
+                        }
+                        for (var j = 0; j < iCSeg.cells.length; j++) {
+                            var vv = userGrid[iCSeg.cells[j]];
+                            if (vv > 0) iMask |= (1 << vv);
+                        }
+                        if (!(iMask & (1 << selVal))) {
+                            cells[i].classList.add('guide-valid');
+                        }
+                    }
+                } else {
+                    for (var i = 0; i < padBtns.length; i++) {
+                        var num = parseInt(padBtns[i].dataset.num, 10);
+                        if (num <= mv && !(usedMask & (1 << num))) {
+                            padBtns[i].classList.add('guide-valid');
+                        }
+                    }
+                }
+            }
+        }
+
+        /* ── Interaction ── */
+        function selectCell(idx) {
+            if (!gameStarted || gameCompleted) return;
+            if (blackCells[idx]) return;
+            selected = idx;
+            renderCells();
+        }
+
+        function inputNumber(num) {
+            if (!gameStarted || gameCompleted || selected < 0) return;
+            if (blackCells[selected] || puzzle[selected] !== 0) return;
+            if (num < 1 || num > maxSegLen) return;
+            if (userGrid[selected] === num) {
+                userGrid[selected] = 0;
+            } else {
+                userGrid[selected] = num;
+            }
+            renderCells();
+            checkComplete();
+        }
+
+        function eraseCell() {
+            if (!gameStarted || gameCompleted || selected < 0) return;
+            if (blackCells[selected] || puzzle[selected] !== 0) return;
+            userGrid[selected] = 0;
+            renderCells();
+        }
+
+        function checkComplete() {
+            var n = config.n;
+            for (var i = 0; i < n * n; i++) {
+                if (!blackCells[i] && userGrid[i] === 0) return;
+            }
+            var errors = findConflicts();
+            for (var i = 0; i < n * n; i++) {
+                if (errors[i]) return;
+            }
+            // All white cells filled, no conflicts → by pigeonhole each segment
+            // of length L contains exactly the set {1..L}. Victory.
+            gameCompleted = true;
+            stopTimer();
+            selected = -1;
+            renderCells();
+            setTimeout(showVictory, 250);
+        }
+
+        function showVictory() {
+            overlayTitleEl.textContent = 'Bravo\u00a0!';
+            finalTimeEl.textContent = 'Temps\u00a0: ' + formatTime(elapsedBeforePause);
+            startHintEl.textContent = isTouchDevice ? 'Toucher pour rejouer' : 'Appuyer sur « Espace » pour rejouer';
+            overlayEl.classList.remove('hidden');
+        }
+
+        /* ── Timer ── */
+        function getElapsed() {
+            if (!gameStarted) return 0;
+            if (gameCompleted) return elapsedBeforePause;
+            return elapsedBeforePause + (Date.now() - startTime);
+        }
+
+        function formatTime(ms) {
+            var s = Math.floor(ms / 1000);
+            var m = Math.floor(s / 60);
+            s = s % 60;
+            return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+        }
+
+        function updateTimer() {
+            timerEl.textContent = formatTime(getElapsed());
+        }
+
+        function startTimer() {
+            startTime = Date.now();
+            updateTimer();
+            timerId = setInterval(updateTimer, 500);
+        }
+
+        function stopTimer() {
+            elapsedBeforePause = getElapsed();
+            if (timerId) { clearInterval(timerId); timerId = 0; }
+        }
+
+        /* ── Game lifecycle ── */
+        function startGame() {
+            if (gameStarted && !gameCompleted) return;
+            if (gameCompleted) newGame();
+            gameStarted = true;
+            gameCompleted = false;
+            overlayEl.classList.add('hidden');
+            startTimer();
+        }
+
+        function showOverlayForNewGame() {
+            stopTimer();
+            gameStarted = false;
+            gameCompleted = false;
+            newGame();
+            overlayTitleEl.textContent = 'Yakazu';
+            finalTimeEl.textContent = '';
+            startHintEl.textContent = isTouchDevice ? 'Toucher pour jouer' : 'Appuyer sur « Espace » pour jouer';
+            overlayEl.classList.remove('hidden');
+        }
+
+        /* ── Settings ── */
+        function updateLabels() {
+            sizeValueEl.textContent = SIZE_CONFIGS[parseInt(settingSizeEl.value, 10)].label;
+            diffValueEl.textContent = DIFF_LABELS[parseInt(settingDiffEl.value, 10)];
+        }
+
+        function saveSettings() {
+            try {
+                localStorage.setItem('yakazu-size', settingSizeEl.value);
+                localStorage.setItem('yakazu-diff', settingDiffEl.value);
+            } catch (e) {}
+        }
+
+        function loadSettings() {
+            try {
+                var s = localStorage.getItem('yakazu-size');
+                var d = localStorage.getItem('yakazu-diff');
+                if (s !== null) settingSizeEl.value = s;
+                if (d !== null) settingDiffEl.value = d;
+            } catch (e) {}
+        }
+
+        settingSizeEl.addEventListener('input', function () {
+            updateLabels();
+            saveSettings();
+            if (!gameStarted) newGame();
+        });
+        settingDiffEl.addEventListener('input', function () {
+            updateLabels();
+            saveSettings();
+            if (!gameStarted) newGame();
+        });
+
+        btnEraseEl.addEventListener('click', eraseCell);
+        btnErrorsEl.addEventListener('click', function () {
+            showErrors = !showErrors;
+            btnErrorsEl.classList.toggle('active', showErrors);
+            renderCells();
+        });
+        btnGuideEl.addEventListener('click', function () {
+            guideActive = !guideActive;
+            btnGuideEl.classList.toggle('active', guideActive);
+            renderCells();
+        });
+        btnNewEl.addEventListener('click', showOverlayForNewGame);
+
+        /* ── Keyboard controls ── */
+        document.addEventListener('keydown', function (e) {
+            var key = e.key;
+
+            if (!overlayEl.classList.contains('hidden')) {
+                if (key === ' ' || key === 'Enter') {
+                    startGame();
+                    e.preventDefault();
+                    return;
+                }
+                return;
+            }
+
+            if (gameCompleted) return;
+
+            var n = config.n;
+
+            // Number input
+            if (key >= '1' && key <= '9') {
+                var num = parseInt(key, 10);
+                inputNumber(num);
+                e.preventDefault();
+                return;
+            }
+            if (key === 'Backspace' || key === 'Delete' || key === '0') {
+                eraseCell();
+                e.preventDefault();
+                return;
+            }
+
+            // Arrow navigation (skips black cells)
+            if (key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight') {
+                if (selected < 0) {
+                    for (var i = 0; i < n * n; i++) {
+                        if (!blackCells[i]) { selectCell(i); break; }
+                    }
+                } else {
+                    var row = Math.floor(selected / n);
+                    var col = selected % n;
+                    var dr = key === 'ArrowUp' ? -1 : key === 'ArrowDown' ? 1 : 0;
+                    var dc = key === 'ArrowLeft' ? -1 : key === 'ArrowRight' ? 1 : 0;
+                    var nr = row + dr, nc = col + dc;
+                    while (nr >= 0 && nr < n && nc >= 0 && nc < n) {
+                        if (!blackCells[nr * n + nc]) {
+                            selectCell(nr * n + nc);
+                            break;
+                        }
+                        nr += dr;
+                        nc += dc;
+                    }
+                }
+                e.preventDefault();
+            }
+        });
+
+        /* ── Tap-to-start on overlay ── */
+        overlayEl.addEventListener('click', function (e) {
+            if (e.target.closest('#settings')) return;
+            startGame();
+        });
+
+        /* ── Init ── */
+        loadSettings();
+        updateLabels();
+        startHintEl.textContent = isTouchDevice ? 'Toucher pour jouer' : 'Appuyer sur « Espace » pour jouer';
+        newGame();
+    })();
+    </script>
+</body>
+</html>
