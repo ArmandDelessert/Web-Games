@@ -308,9 +308,13 @@
                 return;
             }
 
-            // Self collision (skip last 2 segments near head)
+            // Self collision — skip segments near head by path distance
             var hitDist = SNAKE_WIDTH / 2 + 0.5;
-            for (var i = 0; i < snakePath.length - 3; i++) {
+            var safeDist = SNAKE_WIDTH * 4;
+            var pathDist = 0;
+            for (var i = snakePath.length - 2; i >= 0; i--) {
+                pathDist += dist(snakePath[i], snakePath[i + 1]);
+                if (pathDist < safeDist) continue;
                 if (distPointToSeg(head, snakePath[i], snakePath[i + 1]) < hitDist) {
                     endGame();
                     return;
