@@ -311,8 +311,10 @@
             // Self collision — skip segments near head by path distance
             var hitDist = SNAKE_WIDTH / 2 + 0.5;
             var safeDist = SNAKE_WIDTH * 4;
-            var pathDist = 0;
-            for (var i = snakePath.length - 2; i >= 0; i--) {
+            var pathDist = snakePath.length >= 2
+                ? dist(snakePath[snakePath.length - 2], snakePath[snakePath.length - 1])
+                : 0;
+            for (var i = snakePath.length - 3; i >= 0; i--) {
                 pathDist += dist(snakePath[i], snakePath[i + 1]);
                 if (pathDist < safeDist) continue;
                 if (distPointToSeg(head, snakePath[i], snakePath[i + 1]) < hitDist) {
