@@ -413,7 +413,7 @@
                 bestScoreEl.textContent = 'Meilleur : ' + Math.max(best, score);
             }
 
-            restartHintEl.textContent = isTouchDevice ? 'Toucher pour recommencer' : 'Appuyer sur \u00ab\u00a0Espace\u00a0\u00bb pour recommencer';
+            restartHintEl.textContent = isTouchDevice ? 'Toucher pour recommencer' : 'Cliquer ou appuyer sur \u00ab\u00a0Espace\u00a0\u00bb pour recommencer';
             overlayEl.classList.remove('hidden');
         }
 
@@ -422,7 +422,7 @@
             finalScoreEl.textContent = '';
             settingsEl.classList.remove('hidden');
             showBestScore();
-            restartHintEl.textContent = isTouchDevice ? 'Toucher pour jouer' : 'Appuyer sur \u00ab\u00a0Espace\u00a0\u00bb pour jouer';
+            restartHintEl.textContent = isTouchDevice ? 'Toucher pour jouer' : 'Cliquer ou appuyer sur \u00ab\u00a0Espace\u00a0\u00bb pour jouer';
             initGame();
             overlayEl.classList.remove('hidden');
         }
@@ -498,6 +498,21 @@
             }
         });
 
+        /* ── Pointer direction helper ── */
+        function steerToward(svgPt) {
+            if (!gameStarted || gameOver) return;
+            var head = snakePath[snakePath.length - 1];
+            var dx = svgPt.x - head.x;
+            var dy = svgPt.y - head.y;
+            var d = Math.sqrt(dx * dx + dy * dy);
+            if (d > 10) {
+                var newHeading = { x: dx / d, y: dy / d };
+                if (dot(newHeading, heading) > -0.5) {
+                    heading = newHeading;
+                }
+            }
+        }
+
         /* ── Touch controls ── */
         var touchActive = false;
 
@@ -516,20 +531,8 @@
         }, { passive: false });
 
         svgEl.addEventListener('touchmove', function (e) {
-            if (!gameStarted || gameOver || !touchActive) return;
-            var touch = e.touches[0];
-            var svgPt = screenToSVG(touch.clientX, touch.clientY);
-            var head = snakePath[snakePath.length - 1];
-            var dx = svgPt.x - head.x;
-            var dy = svgPt.y - head.y;
-            var d = Math.sqrt(dx * dx + dy * dy);
-            if (d > 10) {
-                var newHeading = { x: dx / d, y: dy / d };
-                // Anti-reversal
-                if (dot(newHeading, heading) > -0.5) {
-                    heading = newHeading;
-                }
-            }
+            if (!touchActive) return;
+            steerToward(screenToSVG(e.touches[0].clientX, e.touches[0].clientY));
             e.preventDefault();
         }, { passive: false });
 
@@ -537,6 +540,16 @@
             touchActive = false;
             e.preventDefault();
         }, { passive: false });
+
+        /* ── Mouse controls ── */
+        svgEl.addEventListener('mousemove', function (e) {
+            steerToward(screenToSVG(e.clientX, e.clientY));
+        });
+
+        svgEl.addEventListener('click', function () {
+            if (gameOver) restartGame();
+            else if (!gameStarted) startGame();
+        });
 
         // Tap-to-start / tap-to-restart via overlay (overlay intercepts touches when visible)
         var overlayTouchStartX, overlayTouchStartY;
@@ -560,12 +573,18 @@
             e.preventDefault();
         }, { passive: false });
 
+        overlayEl.addEventListener('click', function (e) {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'LABEL') return;
+            if (gameOver) restartGame();
+            else if (!gameStarted) startGame();
+        });
+
         /* ── Init ── */
         var savedSettings = loadSettings();
         settingSpeedEl.value = savedSettings.speed;
         updateSettingLabels();
         showBestScore();
-        restartHintEl.textContent = isTouchDevice ? 'Toucher pour jouer' : 'Appuyer sur \u00ab\u00a0Espace\u00a0\u00bb pour jouer';
+        restartHintEl.textContent = isTouchDevice ? 'Toucher pour jouer' : 'Cliquer ou appuyer sur \u00ab\u00a0Espace\u00a0\u00bb pour jouer';
         resize();
         initGame();
     })();
