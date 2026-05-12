@@ -1,0 +1,17 @@
+{
+    "name": "Web-Games",
+    "short_name": "Web-Games",
+    "description": "Collection de jeux web — puzzles et jeux d'adresse",
+    "start_url": "./",
+    "display": "standalone",
+    "background_color": "#fafafa",
+    "theme_color": "#fafafa",
+    "icons": [
+        {
+            "src": "favicon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any"
+        }
+    ]
+}

@@ -6,6 +6,7 @@ A [few games](https://armanddelessert.github.io/Games/) for [my personal website
 
 ### Puzzle games
 
+- [Memory](Memory/index.html)
 - [Sudoku](Sudoku/index.html)
 - [Yakazu](Yakazu/index.html)
 
