@@ -42,13 +42,14 @@
         }
 
         #game-container {
-            width: min(96vmin, 520px, calc(100vw - 1rem));
+            max-width: calc(100vw - 1rem);
             display: flex; flex-direction: column; align-items: center;
         }
 
         /* ── Header ── */
         #header {
             width: 100%; display: flex; justify-content: space-between; align-items: center;
+            flex-wrap: wrap; gap: 0.3rem;
             margin-bottom: 0.6rem; font-size: 0.9rem;
             font-variant-numeric: tabular-nums;
         }
@@ -67,9 +68,11 @@
         #btn-seen.active { border-color: var(--color-fg); background: var(--color-selected); }
 
         /* ── SVG grid ── */
-        #grid-wrapper { width: 100%; }
+        #grid-wrapper { width: 100%; display: flex; justify-content: center; }
         #grid {
-            width: 100%; height: auto; display: block;
+            display: block;
+            max-width: 100%;
+            max-height: calc(100vh - 4rem);
         }
 
         /* ── Card SVG elements ── */
@@ -202,8 +205,8 @@
                     <span>Paires</span>
                     <span class="setting-value" id="pairs-value">5 paires</span>
                 </div>
-                <input type="range" id="setting-pairs" min="0" max="4" step="1" value="1">
-                <div class="setting-ticks"><span></span><span></span><span></span><span></span><span></span></div>
+                <input type="range" id="setting-pairs" min="0" max="11" step="1" value="1">
+                <div class="setting-ticks"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
             </div>
         </div>
         <button id="btn-start">Jouer</button>
@@ -222,21 +225,36 @@
     (function () {
         'use strict';
 
-        /* ── Emoji pool (18 unique — enough for 6×6) ── */
+        /* ── Emoji pool (50 unique) ── */
         var EMOJIS = [
-            '🐶','🐱','🦊','🐻','🐼','🦁',
-            '🐸','🐧','🦉','🦋','🐝','🌸',
-            '🍎','🍋','🍇','🚀','⭐','🎸'
+            '🐶','🐱','🦊','🐻','🐼','🦁','🐸','🐧','🦉','🦋',
+            '🐝','🌸','🍎','🍋','🍇','🚀','⭐','🎸','🎯','🎨',
+            '🎭','🎪','🎲','🏀','⚽','🎾','🎮','🌈','🌙','🔥',
+            '💎','🍕','🍩','🍦','🧁','🎂','🌺','🌻','🍄','🌵',
+            '🐚','🦀','🐬','🦈','🦜','🦩','🐘','🦒','🦔','🐢'
         ];
 
-        /* ── Grid configurations ── */
-        var GRIDS = [
-            { cols: 4, rows: 2, pairs: 4,  label: '4 paires' },
-            { cols: 5, rows: 2, pairs: 5,  label: '5 paires' },
-            { cols: 4, rows: 3, pairs: 6,  label: '6 paires' },
-            { cols: 4, rows: 4, pairs: 8,  label: '8 paires' },
-            { cols: 5, rows: 4, pairs: 10, label: '10 paires' }
-        ];
+        /* ── Pair options ── */
+        var PAIR_OPTIONS = [4, 6, 8, 10, 12, 16, 20, 25, 30, 36, 42, 50];
+
+        function computeGrid(pairs) {
+            var n = pairs * 2;
+            var screenW = window.innerWidth;
+            var screenH = window.innerHeight;
+            var targetRatio = screenW / screenH;
+            var bestCols = n, bestRows = 1, bestDiff = Infinity;
+            for (var rows = 1; rows <= n; rows++) {
+                if (n % rows !== 0) continue;
+                var cols = n / rows;
+                var diff = Math.abs(Math.log(cols / rows) - Math.log(targetRatio));
+                if (diff < bestDiff) {
+                    bestDiff = diff;
+                    bestCols = cols;
+                    bestRows = rows;
+                }
+            }
+            return { cols: bestCols, rows: bestRows };
+        }
 
         /* Card geometry (SVG units) */
         var CARD = 80, GAP = 8;
@@ -256,7 +274,7 @@
         var pairsValueEl = document.getElementById('pairs-value');
 
         /* ── State ── */
-        var selectedGrid = 1;   /* index into GRIDS */
+        var selectedPairs = 1;  /* index into PAIR_OPTIONS */
         var cards = [];         /* {el, emoji, open, matched, seen} */
         var showSeen = false;
         var flipped = [];       /* up to 2 cards currently revealed */
@@ -270,11 +288,12 @@
 
         /* ── Settings ── */
         function updatePairsLabel() {
-            pairsValueEl.textContent = GRIDS[parseInt(settingPairs.value, 10)].label;
+            var idx = parseInt(settingPairs.value, 10);
+            pairsValueEl.textContent = PAIR_OPTIONS[idx] + ' paires';
         }
 
         settingPairs.addEventListener('input', function () {
-            selectedGrid = parseInt(settingPairs.value, 10);
+            selectedPairs = parseInt(settingPairs.value, 10);
             updatePairsLabel();
             try { localStorage.setItem('memory-pairs', settingPairs.value); } catch (e) {}
         });
@@ -282,7 +301,7 @@
         (function loadSettings() {
             try {
                 var v = localStorage.getItem('memory-pairs');
-                if (v !== null) { settingPairs.value = v; selectedGrid = parseInt(v, 10); }
+                if (v !== null) { settingPairs.value = v; selectedPairs = parseInt(v, 10); }
             } catch (e) {}
             updatePairsLabel();
         })();
@@ -297,15 +316,15 @@
         }
 
         /* ── Build SVG grid ── */
-        function buildGrid(gridCfg) {
-            var cols = gridCfg.cols, rows = gridCfg.rows;
-            var pairs = cols * rows / 2;
+        function buildGrid(pairs) {
+            var layout = computeGrid(pairs);
+            var cols = layout.cols, rows = layout.rows;
             var vbW = cols * (CARD + GAP) + GAP;
             var vbH = rows * (CARD + GAP) + GAP;
             svg.setAttribute('viewBox', '0 0 ' + vbW + ' ' + vbH);
 
             /* Pick emojis for this game */
-            var pool = EMOJIS.slice(0, pairs);
+            var pool = shuffle(EMOJIS.slice()).slice(0, pairs);
             var deck = shuffle(pool.concat(pool));
 
             svg.innerHTML = '';
@@ -456,7 +475,7 @@
             updateMoves();
             timerEl.textContent = '00:00';
             winOvl.classList.remove('open');
-            buildGrid(GRIDS[selectedGrid]);
+            buildGrid(PAIR_OPTIONS[selectedPairs]);
         }
 
         /* ── Event listeners ── */
