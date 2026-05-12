@@ -133,9 +133,6 @@
         #overlay.hidden { display: none; }
 
         #overlay h1 { font-size: 1.6rem; margin-bottom: 0.3rem; }
-        #overlay .subtitle {
-            color: var(--color-muted); font-size: 0.9rem; margin-bottom: 2rem;
-        }
 
         #settings { display: flex; flex-direction: column; gap: 0.9rem; margin: 1rem auto 1.5rem; width: 240px; }
         .setting-row { display: flex; flex-direction: column; gap: 0.25rem; }
@@ -199,15 +196,14 @@
     <!-- Start overlay -->
     <div id="overlay">
         <h1>Memory</h1>
-        <p class="subtitle">Retournez les cartes par paires</p>
         <div id="settings">
             <div class="setting-row">
                 <div class="setting-header">
                     <span>Paires</span>
                     <span class="setting-value" id="pairs-value">5 paires</span>
                 </div>
-                <input type="range" id="setting-pairs" min="0" max="11" step="1" value="1">
-                <div class="setting-ticks"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+                <input type="range" id="setting-pairs" min="0" max="17" step="1" value="2">
+                <div class="setting-ticks"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
             </div>
         </div>
         <button id="btn-start">Jouer</button>
@@ -226,35 +222,45 @@
     (function () {
         'use strict';
 
-        /* ── Emoji pool (50 unique) ── */
+        /* ── Emoji pool (72 unique) ── */
         var EMOJIS = [
             '🐶','🐱','🦊','🐻','🐼','🦁','🐸','🐧','🦉','🦋',
             '🐝','🌸','🍎','🍋','🍇','🚀','⭐','🎸','🎯','🎨',
             '🎭','🎪','🎲','🏀','⚽','🎾','🎮','🌈','🌙','🔥',
             '💎','🍕','🍩','🍦','🧁','🎂','🌺','🌻','🍄','🌵',
-            '🐚','🦀','🐬','🦈','🦜','🦩','🐘','🦒','🦔','🐢'
+            '🐚','🦀','🐬','🦈','🦜','🦩','🐘','🦒','🦔','🐢',
+            '🦄','🐙','🦞','🐳','🦚','🐿️','🦆','🐞','🍀','🌴',
+            '🍉','🍊','🥝','🥥','🌶️','🧀','🎹','🎺','🎻','🥁',
+            '🏆','🎖️'
         ];
 
-        /* ── Pair options ── */
-        var PAIR_OPTIONS = [4, 6, 8, 10, 12, 16, 20, 25, 30, 36, 42, 50];
+        /* ── Pair options with suggested grid dimensions ── */
+        var PAIR_OPTIONS = [
+            { pairs: 6,  cols: 4,  rows: 3  },
+            { pairs: 8,  cols: 4,  rows: 4  },
+            { pairs: 10, cols: 5,  rows: 4  },
+            { pairs: 12, cols: 6,  rows: 4  },
+            { pairs: 15, cols: 6,  rows: 5  },
+            { pairs: 18, cols: 6,  rows: 6  },
+            { pairs: 21, cols: 7,  rows: 6  },
+            { pairs: 24, cols: 8,  rows: 6  },
+            { pairs: 28, cols: 8,  rows: 7  },
+            { pairs: 32, cols: 8,  rows: 8  },
+            { pairs: 35, cols: 10, rows: 7  },
+            { pairs: 40, cols: 10, rows: 8  },
+            { pairs: 45, cols: 10, rows: 9  },
+            { pairs: 50, cols: 10, rows: 10 },
+            { pairs: 54, cols: 12, rows: 9  },
+            { pairs: 60, cols: 12, rows: 10 },
+            { pairs: 66, cols: 12, rows: 11 },
+            { pairs: 72, cols: 12, rows: 12 }
+        ];
 
-        function computeGrid(pairs) {
-            var n = pairs * 2;
-            var screenW = window.innerWidth;
-            var screenH = window.innerHeight;
-            var targetRatio = screenW / screenH;
-            var bestCols = n, bestRows = 1, bestDiff = Infinity;
-            for (var rows = 1; rows <= n; rows++) {
-                if (n % rows !== 0) continue;
-                var cols = n / rows;
-                var diff = Math.abs(Math.log(cols / rows) - Math.log(targetRatio));
-                if (diff < bestDiff) {
-                    bestDiff = diff;
-                    bestCols = cols;
-                    bestRows = rows;
-                }
-            }
-            return { cols: bestCols, rows: bestRows };
+        function computeGrid(option) {
+            var landscape = window.innerWidth >= window.innerHeight;
+            var cols = landscape ? Math.max(option.cols, option.rows) : Math.min(option.cols, option.rows);
+            var rows = landscape ? Math.min(option.cols, option.rows) : Math.max(option.cols, option.rows);
+            return { cols: cols, rows: rows };
         }
 
         /* Card geometry (SVG units) */
@@ -290,7 +296,7 @@
         /* ── Settings ── */
         function updatePairsLabel() {
             var idx = parseInt(settingPairs.value, 10);
-            pairsValueEl.textContent = PAIR_OPTIONS[idx] + ' paires';
+            pairsValueEl.textContent = PAIR_OPTIONS[idx].pairs + ' paires';
         }
 
         settingPairs.addEventListener('input', function () {
@@ -317,9 +323,10 @@
         }
 
         /* ── Build SVG grid ── */
-        function buildGrid(pairs) {
-            var layout = computeGrid(pairs);
+        function buildGrid(option) {
+            var layout = computeGrid(option);
             var cols = layout.cols, rows = layout.rows;
+            var pairs = option.pairs;
             var vbW = cols * (CARD + GAP) + GAP;
             var vbH = rows * (CARD + GAP) + GAP;
             svg.setAttribute('viewBox', '0 0 ' + vbW + ' ' + vbH);
@@ -477,6 +484,8 @@
             timerEl.textContent = '00:00';
             winOvl.classList.remove('open');
             buildGrid(PAIR_OPTIONS[selectedPairs]);
+            showSeen = false;
+            btnSeen.classList.remove('active');
         }
 
         /* ── Event listeners ── */
