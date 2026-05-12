@@ -34,7 +34,7 @@
                          "Helvetica Neue", Arial, sans-serif;
             background: var(--color-bg);
             color: var(--color-fg);
-            display: flex; flex-direction: column; align-items: center;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
             min-height: 100vh;
             padding: 0.5rem;
             -webkit-tap-highlight-color: transparent;
@@ -133,25 +133,24 @@
             color: var(--color-muted); font-size: 0.9rem; margin-bottom: 2rem;
         }
 
-        .grid-options {
-            display: grid; grid-template-columns: 1fr 1fr;
-            gap: 0.75rem; width: min(320px, 90vw);
-            margin-bottom: 1.5rem;
+        #settings { display: flex; flex-direction: column; gap: 0.9rem; margin: 1rem auto 1.5rem; width: 240px; }
+        .setting-row { display: flex; flex-direction: column; gap: 0.25rem; }
+        .setting-header { display: flex; justify-content: space-between; font-size: 0.9rem; }
+        .setting-value { font-variant-numeric: tabular-nums; }
+        input[type="range"] {
+            -webkit-appearance: none; appearance: none; width: 100%; height: 6px;
+            background: var(--color-muted); border-radius: 3px; outline: none; cursor: pointer;
         }
-        .grid-opt {
-            border: 1px solid var(--color-muted);
-            border-radius: 8px; padding: 0.8rem 0.5rem;
-            text-align: center; cursor: pointer;
-            transition: border-color 0.15s, background 0.15s;
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none; width: 16px; height: 16px;
+            background: var(--color-fg); border-radius: 50%; cursor: pointer;
         }
-        .grid-opt:hover { border-color: var(--color-fg); }
-        .grid-opt.selected {
-            border-color: var(--color-fg);
-            border-width: 2px;
-            background: var(--color-card-back);
+        input[type="range"]::-moz-range-thumb {
+            width: 16px; height: 16px; background: var(--color-fg); border: none;
+            border-radius: 50%; cursor: pointer;
         }
-        .grid-opt .pairs { font-size: 1.1rem; font-weight: 700; }
-        .grid-opt .dims { font-size: 0.78rem; color: var(--color-muted); margin-top: 0.2rem; }
+        .setting-ticks { display: flex; justify-content: space-between; padding: 0 7px; margin-top: 2px; }
+        .setting-ticks span { width: 1px; height: 6px; background: var(--color-muted); }
 
         #btn-start {
             padding: 0.65rem 2.5rem;
@@ -185,7 +184,7 @@
         <div id="header">
             <span id="moves-el">Coups : 0</span>
             <span id="timer-el">00:00</span>
-            <button id="btn-seen">Vues</button>
+            <button id="btn-seen">Cartes vues</button>
             <button id="btn-new">Nouvelle partie</button>
         </div>
         <div id="grid-wrapper">
@@ -197,7 +196,16 @@
     <div id="overlay">
         <h1>Memory</h1>
         <p class="subtitle">Retournez les cartes par paires</p>
-        <div class="grid-options" id="grid-options"></div>
+        <div id="settings">
+            <div class="setting-row">
+                <div class="setting-header">
+                    <span>Paires</span>
+                    <span class="setting-value" id="pairs-value">5 paires</span>
+                </div>
+                <input type="range" id="setting-pairs" min="0" max="4" step="1" value="1">
+                <div class="setting-ticks"><span></span><span></span><span></span><span></span><span></span></div>
+            </div>
+        </div>
         <button id="btn-start">Jouer</button>
     </div>
 
@@ -223,27 +231,29 @@
 
         /* ── Grid configurations ── */
         var GRIDS = [
-            { cols: 4, rows: 2, label: '4 paires',  dims: '4 × 2' },
-            { cols: 4, rows: 4, label: '8 paires',  dims: '4 × 4' },
-            { cols: 6, rows: 4, label: '12 paires', dims: '6 × 4' },
-            { cols: 6, rows: 6, label: '18 paires', dims: '6 × 6' }
+            { cols: 4, rows: 2, pairs: 4,  label: '4 paires' },
+            { cols: 5, rows: 2, pairs: 5,  label: '5 paires' },
+            { cols: 4, rows: 3, pairs: 6,  label: '6 paires' },
+            { cols: 4, rows: 4, pairs: 8,  label: '8 paires' },
+            { cols: 5, rows: 4, pairs: 10, label: '10 paires' }
         ];
 
         /* Card geometry (SVG units) */
         var CARD = 80, GAP = 8;
 
         /* ── DOM ── */
-        var svg       = document.getElementById('grid');
-        var overlay   = document.getElementById('overlay');
-        var optsCont  = document.getElementById('grid-options');
-        var btnStart  = document.getElementById('btn-start');
-        var winOvl    = document.getElementById('win-overlay');
-        var winStats  = document.getElementById('win-stats');
-        var btnReplay = document.getElementById('btn-replay');
-        var btnNew    = document.getElementById('btn-new');
-        var btnSeen   = document.getElementById('btn-seen');
-        var movesEl   = document.getElementById('moves-el');
-        var timerEl   = document.getElementById('timer-el');
+        var svg          = document.getElementById('grid');
+        var overlay      = document.getElementById('overlay');
+        var btnStart     = document.getElementById('btn-start');
+        var winOvl       = document.getElementById('win-overlay');
+        var winStats     = document.getElementById('win-stats');
+        var btnReplay    = document.getElementById('btn-replay');
+        var btnNew       = document.getElementById('btn-new');
+        var btnSeen      = document.getElementById('btn-seen');
+        var movesEl      = document.getElementById('moves-el');
+        var timerEl      = document.getElementById('timer-el');
+        var settingPairs = document.getElementById('setting-pairs');
+        var pairsValueEl = document.getElementById('pairs-value');
 
         /* ── State ── */
         var selectedGrid = 1;   /* index into GRIDS */
@@ -258,20 +268,24 @@
         var timerId = 0;
         var elapsed = 0;
 
-        /* ── Settings: build grid-size buttons ── */
-        GRIDS.forEach(function (g, i) {
-            var d = document.createElement('div');
-            d.className = 'grid-opt' + (i === selectedGrid ? ' selected' : '');
-            d.innerHTML = '<div class="pairs">' + g.label + '</div>'
-                        + '<div class="dims">' + g.dims + '</div>';
-            d.addEventListener('click', function () {
-                selectedGrid = i;
-                optsCont.querySelectorAll('.grid-opt').forEach(function (el, j) {
-                    el.classList.toggle('selected', j === i);
-                });
-            });
-            optsCont.appendChild(d);
+        /* ── Settings ── */
+        function updatePairsLabel() {
+            pairsValueEl.textContent = GRIDS[parseInt(settingPairs.value, 10)].label;
+        }
+
+        settingPairs.addEventListener('input', function () {
+            selectedGrid = parseInt(settingPairs.value, 10);
+            updatePairsLabel();
+            try { localStorage.setItem('memory-pairs', settingPairs.value); } catch (e) {}
         });
+
+        (function loadSettings() {
+            try {
+                var v = localStorage.getItem('memory-pairs');
+                if (v !== null) { settingPairs.value = v; selectedGrid = parseInt(v, 10); }
+            } catch (e) {}
+            updatePairsLabel();
+        })();
 
         /* ── Shuffle ── */
         function shuffle(arr) {
