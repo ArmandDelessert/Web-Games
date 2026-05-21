@@ -93,6 +93,47 @@
         .game-link:hover {
             border-color: var(--color-fg);
         }
+
+        /* ── History section ── */
+        #history-section {
+            margin-top: 0.5rem;
+        }
+        .history-entry {
+            padding: 0.6rem 0.8rem;
+            background: var(--color-card);
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+        }
+        .history-main {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 0.5rem;
+        }
+        .history-game {
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+        .history-date {
+            color: var(--color-muted);
+            font-size: 0.8rem;
+            white-space: nowrap;
+        }
+        .history-details {
+            color: var(--color-muted);
+            font-size: 0.82rem;
+            margin-top: 0.15rem;
+        }
+        .history-aid {
+            display: inline-block;
+            border: 1px solid var(--color-border);
+            border-radius: 3px;
+            padding: 0 0.3rem;
+            font-size: 0.72rem;
+            margin-left: 0.35rem;
+            vertical-align: 1px;
+        }
     </style>
 </head>
 <body>
@@ -117,11 +158,122 @@
                 <a class="game-link" href="Billard/">Billard</a>
             </div>
         </section>
+        <section id="history-section" style="display:none">
+            <h2>Dernières parties</h2>
+            <div id="history-list"></div>
+        </section>
     </main>
     <script>
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js');
     }
+
+    (function () {
+        var MONTHS = ['jan.','fév.','mars','avr.','mai','juin',
+                      'juil.','août','sept.','oct.','nov.','déc.'];
+        var DIFF_LABELS = ['Facile', 'Normale', 'Difficile'];
+
+        function load(key) {
+            try { return JSON.parse(localStorage.getItem(key)) || []; }
+            catch (e) { return []; }
+        }
+
+        function fmtDuration(ms) {
+            var s = Math.floor(ms / 1000);
+            var m = Math.floor(s / 60);
+            s %= 60;
+            return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+        }
+
+        function fmtDate(iso) {
+            var d = new Date(iso);
+            return d.getDate() + ' ' + MONTHS[d.getMonth()] + ' '
+                + (d.getHours() < 10 ? '0' : '') + d.getHours() + ':'
+                + (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
+        }
+
+        function fmtSize(e) {
+            if (e.game === 'Memory') return e.size.pairs + ' paires';
+            return e.size + '×' + e.size;
+        }
+
+        function fmtStats(e) {
+            if (e.game === 'Memory') {
+                var t = e.stats.moves + ' coup' + (e.stats.moves > 1 ? 's' : '');
+                if (e.stats.firstTry) t += ' · ' + e.stats.firstTry + ' du 1er coup';
+                return t;
+            }
+            var p = [];
+            if (e.stats.correct) p.push(e.stats.correct + ' ✓');
+            if (e.stats.incorrect) p.push(e.stats.incorrect + ' ✗');
+            return p.join(' · ');
+        }
+
+        function getAids(e) {
+            var a = [];
+            if (e.game === 'Memory') {
+                if (e.aids && e.aids.seen) a.push('Cartes vues');
+            } else {
+                if (e.aids && e.aids.errors) a.push('Erreurs');
+                if (e.aids && e.aids.guide) a.push('Guide');
+            }
+            return a;
+        }
+
+        var all = [];
+        load('sudoku-history').forEach(function (e) { e.game = 'Sudoku'; all.push(e); });
+        load('yakazu-history').forEach(function (e) { e.game = 'Yakazu'; all.push(e); });
+        load('memory-history').forEach(function (e) { e.game = 'Memory'; all.push(e); });
+
+        if (!all.length) return;
+
+        all.sort(function (a, b) { return b.date.localeCompare(a.date); });
+        var recent = all.slice(0, 20);
+
+        var section = document.getElementById('history-section');
+        var list = document.getElementById('history-list');
+        section.style.display = '';
+
+        recent.forEach(function (entry) {
+            var div = document.createElement('div');
+            div.className = 'history-entry';
+
+            var main = document.createElement('div');
+            main.className = 'history-main';
+
+            var label = entry.game + ' · ' + fmtSize(entry);
+            if (entry.difficulty !== undefined) label += ' · ' + DIFF_LABELS[entry.difficulty];
+
+            var nameEl = document.createElement('span');
+            nameEl.className = 'history-game';
+            nameEl.textContent = label;
+            main.appendChild(nameEl);
+
+            var dateEl = document.createElement('span');
+            dateEl.className = 'history-date';
+            dateEl.textContent = fmtDate(entry.date);
+            main.appendChild(dateEl);
+
+            div.appendChild(main);
+
+            var details = document.createElement('div');
+            details.className = 'history-details';
+            var dt = fmtDuration(entry.duration);
+            var st = fmtStats(entry);
+            if (st) dt += ' · ' + st;
+            details.textContent = dt;
+
+            getAids(entry).forEach(function (aid) {
+                var badge = document.createElement('span');
+                badge.className = 'history-aid';
+                badge.textContent = aid;
+                details.appendChild(badge);
+            });
+
+            div.appendChild(details);
+            list.appendChild(div);
+        });
+    })();
     </script>
 </body>
 </html>
