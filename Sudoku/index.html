@@ -232,6 +232,11 @@
         var startTime = 0;
         var elapsedBeforePause = 0;
         var timerId = 0;
+        var gameLog = [];
+        var usedErrors = false;
+        var usedGuide = false;
+        var correctCount = 0;
+        var incorrectCount = 0;
 
         /* ── DOM ── */
         var containerEl = document.getElementById('game-container');
@@ -509,8 +514,12 @@
             if (puzzle[selected] !== 0) return;
             if (userGrid[selected] === num) {
                 userGrid[selected] = 0;
+                gameLog.push({ t: getElapsed(), cell: selected, val: 0, correct: null });
             } else {
                 userGrid[selected] = num;
+                var correct = num === solution[selected];
+                if (correct) correctCount++; else incorrectCount++;
+                gameLog.push({ t: getElapsed(), cell: selected, val: num, correct: correct });
             }
             renderCells();
             checkComplete();
@@ -519,6 +528,8 @@
         function eraseCell() {
             if (!gameStarted || gameCompleted || selected < 0) return;
             if (puzzle[selected] !== 0) return;
+            if (userGrid[selected] === 0) return;
+            gameLog.push({ t: getElapsed(), cell: selected, val: 0, correct: null });
             userGrid[selected] = 0;
             renderCells();
         }
@@ -536,6 +547,15 @@
             stopTimer();
             selected = -1;
             renderCells();
+            saveHistory({
+                date: new Date().toISOString(),
+                duration: elapsedBeforePause,
+                size: config.n,
+                difficulty: parseInt(settingDiffEl.value, 10),
+                aids: { errors: usedErrors, guide: usedGuide },
+                stats: { correct: correctCount, incorrect: incorrectCount },
+                log: gameLog
+            });
             setTimeout(showVictory, 250);
         }
 
@@ -575,6 +595,19 @@
             if (timerId) { clearInterval(timerId); timerId = 0; }
         }
 
+        /* ── History persistence ── */
+        function loadHistory() {
+            try { return JSON.parse(localStorage.getItem('sudoku-history')) || []; }
+            catch (e) { return []; }
+        }
+        function saveHistory(record) {
+            try {
+                var hist = loadHistory();
+                hist.push(record);
+                localStorage.setItem('sudoku-history', JSON.stringify(hist));
+            } catch (e) {}
+        }
+
         /* ── Game lifecycle ── */
         function newGame() {
             var sizeIdx = parseInt(settingSizeEl.value, 10);
@@ -598,6 +631,11 @@
             if (gameCompleted) newGame();
             gameStarted = true;
             gameCompleted = false;
+            gameLog = [];
+            usedErrors = false;
+            usedGuide = false;
+            correctCount = 0;
+            incorrectCount = 0;
             overlayEl.classList.add('hidden');
             startTimer();
         }
@@ -649,11 +687,13 @@
         btnEraseEl.addEventListener('click', eraseCell);
         btnErrorsEl.addEventListener('click', function () {
             showErrors = !showErrors;
+            if (showErrors && gameStarted && !gameCompleted) usedErrors = true;
             btnErrorsEl.classList.toggle('active', showErrors);
             renderCells();
         });
         btnGuideEl.addEventListener('click', function () {
             guideActive = !guideActive;
+            if (guideActive && gameStarted && !gameCompleted) usedGuide = true;
             btnGuideEl.classList.toggle('active', guideActive);
             renderCells();
         });

@@ -292,6 +292,9 @@
         var timerStart = 0;
         var timerId = 0;
         var elapsed = 0;
+        var gameLog = [];
+        var usedSeen = false;
+        var firstTryCount = 0;
 
         /* ── Settings ── */
         function updatePairsLabel() {
@@ -407,8 +410,13 @@
             if (flipped.length === 2) {
                 moves++;
                 updateMoves();
-                if (flipped[0].emoji === flipped[1].emoji) {
-                    /* Match */
+                var isMatch = flipped[0].emoji === flipped[1].emoji;
+                var elapsed_t = timerStart ? Date.now() - timerStart : 0;
+                var idx0 = parseInt(flipped[0].el.getAttribute('data-idx'), 10);
+                var idx1 = parseInt(flipped[1].el.getAttribute('data-idx'), 10);
+                gameLog.push({ t: elapsed_t, cards: [idx0, idx1], match: isMatch });
+                if (isMatch) {
+                    if (!flipped[0].wasSeen && !flipped[1].wasSeen) firstTryCount++;
                     flipped.forEach(function (c) {
                         c.matched = true;
                         c.el.classList.remove('open', 'seen');
@@ -434,6 +442,7 @@
         }
 
         function reveal(card) {
+            card.wasSeen = card.seen;
             card.open = true;
             card.seen = true;
             card.el.classList.add('open');
@@ -469,10 +478,32 @@
 
         /* ── Win ── */
         function showWin() {
+            var duration = timerStart ? Date.now() - timerStart : 0;
             var m = Math.floor(elapsed / 60), s = elapsed % 60;
             winStats.textContent = moves + ' coup' + (moves > 1 ? 's' : '')
                 + ' — ' + pad(m) + ':' + pad(s);
+            saveHistory({
+                date: new Date().toISOString(),
+                duration: duration,
+                size: { pairs: totalPairs },
+                aids: { seen: usedSeen },
+                stats: { moves: moves, firstTry: firstTryCount },
+                log: gameLog
+            });
             winOvl.classList.add('open');
+        }
+
+        /* ── History persistence ── */
+        function loadHistory() {
+            try { return JSON.parse(localStorage.getItem('memory-history')) || []; }
+            catch (e) { return []; }
+        }
+        function saveHistory(record) {
+            try {
+                var hist = loadHistory();
+                hist.push(record);
+                localStorage.setItem('memory-history', JSON.stringify(hist));
+            } catch (e) {}
         }
 
         /* ── Start / reset ── */
@@ -480,6 +511,9 @@
             clearInterval(timerId);
             moves = 0; elapsed = 0;
             flipped = []; locked = false;
+            gameLog = [];
+            usedSeen = false;
+            firstTryCount = 0;
             updateMoves();
             timerEl.textContent = '00:00';
             winOvl.classList.remove('open');
@@ -496,6 +530,7 @@
 
         btnSeen.addEventListener('click', function () {
             showSeen = !showSeen;
+            if (showSeen) usedSeen = true;
             btnSeen.classList.toggle('active', showSeen);
             updateSeenDisplay();
         });
