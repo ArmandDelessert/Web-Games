@@ -16,7 +16,7 @@
             --color-selected: #c4c4c4;
         }
         @media (prefers-color-scheme: dark) {
-            :root {
+            :root:not([data-theme="light"]) {
                 --color-bg: #121212;
                 --color-fg: #e0e0e0;
                 --color-muted: #666;
@@ -25,6 +25,15 @@
                 --color-matched: #333;
                 --color-selected: #3a3a3a;
             }
+        }
+        :root[data-theme="dark"] {
+            --color-bg: #121212;
+            --color-fg: #e0e0e0;
+            --color-muted: #666;
+            --color-card-back: #2a2a2a;
+            --color-card-front: #1e1e1e;
+            --color-matched: #333;
+            --color-selected: #3a3a3a;
         }
 
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -36,10 +45,27 @@
             color: var(--color-fg);
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             min-height: 100vh;
-            padding: 0.5rem;
+            padding: 2.3rem 0.5rem 0.5rem;
             -webkit-tap-highlight-color: transparent;
             user-select: none; -webkit-user-select: none;
         }
+
+        /* ── Topbar ── */
+        #topbar {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0.4rem 0.8rem;
+            background: var(--color-bg);
+            font-size: 0.85rem;
+        }
+        #topbar a { color: var(--color-muted); text-decoration: none; }
+        #topbar a:hover { color: var(--color-fg); }
+        #btn-theme {
+            background: none; border: 1px solid var(--color-muted);
+            color: var(--color-fg); border-radius: 4px;
+            padding: 0.15rem 0.5rem; cursor: pointer; font-size: 0.85rem;
+        }
+        #btn-theme:hover { border-color: var(--color-fg); }
 
         #game-container {
             width: calc(100vw - 1rem);
@@ -179,8 +205,15 @@
             border: none; border-radius: 6px; font-size: 0.95rem; cursor: pointer;
         }
     </style>
+    <script>
+        (function(){var t=localStorage.getItem('theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.setAttribute('data-theme','dark');if(t==='light')document.documentElement.setAttribute('data-theme','light');})();
+    </script>
 </head>
 <body>
+    <nav id="topbar">
+        <a href="../" id="btn-home">&#8592; Accueil</a>
+        <button type="button" id="btn-theme" aria-label="Thème"></button>
+    </nav>
     <div id="game-container">
         <div id="header">
             <span id="moves-el">Coups : 0</span>
@@ -205,6 +238,11 @@
                 <input type="range" id="setting-pairs" min="0" max="17" step="1" value="2">
                 <div class="setting-ticks"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
             </div>
+        </div>
+        <p id="resume-info" style="display:none"></p>
+        <div id="resume-actions" style="display:none">
+            <button id="btn-resume" style="padding:0.65rem 2rem;background:var(--color-fg);color:var(--color-bg);border:none;border-radius:6px;font-size:1rem;cursor:pointer;margin-right:0.5rem">Reprendre</button>
+            <button id="btn-new-instead" style="padding:0.65rem 2rem;background:none;color:var(--color-fg);border:1px solid var(--color-fg);border-radius:6px;font-size:1rem;cursor:pointer">Nouvelle partie</button>
         </div>
         <button id="btn-start">Jouer</button>
     </div>
@@ -326,7 +364,7 @@
         }
 
         /* ── Build SVG grid ── */
-        function buildGrid(option) {
+        function buildGrid(option, deckOverride) {
             var layout = computeGrid(option);
             var cols = layout.cols, rows = layout.rows;
             var pairs = option.pairs;
@@ -335,8 +373,13 @@
             svg.setAttribute('viewBox', '0 0 ' + vbW + ' ' + vbH);
 
             /* Pick emojis for this game */
-            var pool = shuffle(EMOJIS.slice()).slice(0, pairs);
-            var deck = shuffle(pool.concat(pool));
+            var deck;
+            if (deckOverride) {
+                deck = deckOverride;
+            } else {
+                var pool = shuffle(EMOJIS.slice()).slice(0, pairs);
+                deck = shuffle(pool.concat(pool));
+            }
 
             svg.innerHTML = '';
             cards = [];
@@ -426,7 +469,10 @@
                     matchedPairs++;
                     if (matchedPairs === totalPairs) {
                         clearInterval(timerId);
+                        clearAutosave();
                         setTimeout(showWin, 400);
+                    } else {
+                        saveAutosaveState();
                     }
                 } else {
                     /* Mismatch — flip back after delay */
@@ -436,6 +482,7 @@
                         flipped = [];
                         locked = false;
                         updateSeenDisplay();
+                        saveAutosaveState();
                     }, 900);
                 }
             }
@@ -506,6 +553,42 @@
             } catch (e) {}
         }
 
+        /* ── Autosave ── */
+        var AUTOSAVE_KEY = 'memory-autosave';
+        function saveAutosaveState() {
+            try {
+                var cardEmojis = cards.map(function (c) { return c.emoji; });
+                var cardMatched = cards.map(function (c) { return c.matched; });
+                var cardSeen = cards.map(function (c) { return c.seen; });
+                var now = Date.now();
+                var elapsedMs = timerStart ? now - timerStart : 0;
+                var state = {
+                    pairsIdx: selectedPairs,
+                    cardEmojis: cardEmojis,
+                    cardMatched: cardMatched,
+                    cardSeen: cardSeen,
+                    moves: moves,
+                    matchedPairs: matchedPairs,
+                    totalPairs: totalPairs,
+                    elapsed: elapsedMs,
+                    showSeen: showSeen,
+                    usedSeen: usedSeen,
+                    gameLog: gameLog,
+                    firstTryCount: firstTryCount
+                };
+                localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(state));
+            } catch (e) {}
+        }
+        function loadAutosave() {
+            try {
+                var raw = localStorage.getItem(AUTOSAVE_KEY);
+                return raw ? JSON.parse(raw) : null;
+            } catch (e) { return null; }
+        }
+        function clearAutosave() {
+            try { localStorage.removeItem(AUTOSAVE_KEY); } catch (e) {}
+        }
+
         /* ── Start / reset ── */
         function startGame() {
             clearInterval(timerId);
@@ -542,8 +625,120 @@
 
         btnNew.addEventListener('click', function () {
             clearInterval(timerId);
+            clearAutosave();
+            document.getElementById('resume-info').style.display = 'none';
+            document.getElementById('resume-actions').style.display = 'none';
+            document.getElementById('btn-start').style.display = '';
             overlay.classList.remove('hidden');
         });
+
+        /* ── Restore from autosave ── */
+        function restoreFromAutosave(state) {
+            clearInterval(timerId);
+            selectedPairs = state.pairsIdx;
+            settingPairs.value = selectedPairs;
+            updatePairsLabel();
+
+            var option = PAIR_OPTIONS[selectedPairs];
+            buildGrid(option, state.cardEmojis);
+
+            moves = state.moves;
+            matchedPairs = state.matchedPairs;
+            totalPairs = state.totalPairs;
+            showSeen = state.showSeen;
+            usedSeen = state.usedSeen;
+            gameLog = state.gameLog || [];
+            firstTryCount = state.firstTryCount || 0;
+            flipped = [];
+            locked = false;
+
+            updateMoves();
+            btnSeen.classList.toggle('active', showSeen);
+
+            /* Restore matched & seen flags */
+            state.cardMatched.forEach(function (m, i) {
+                if (m) {
+                    cards[i].matched = true;
+                    cards[i].el.classList.add('done');
+                }
+            });
+            state.cardSeen.forEach(function (s, i) {
+                cards[i].seen = s;
+            });
+            updateSeenDisplay();
+
+            /* Restart timer from saved elapsed */
+            timerStart = Date.now() - (state.elapsed || 0);
+            elapsed = Math.floor((state.elapsed || 0) / 1000);
+            var m = Math.floor(elapsed / 60), s = elapsed % 60;
+            timerEl.textContent = pad(m) + ':' + pad(s);
+            timerId = setInterval(tickTimer, 500);
+
+            overlay.classList.add('hidden');
+            winOvl.classList.remove('open');
+        }
+
+        /* ── Visibility change — autosave when leaving ── */
+        document.addEventListener('visibilitychange', function () {
+            if (document.hidden && matchedPairs < totalPairs && moves > 0) {
+                saveAutosaveState();
+            }
+        });
+
+        /* ── Theme toggle ── */
+        (function () {
+            var THEME_CYCLE = { auto: 'dark', dark: 'light', light: 'auto' };
+            var THEME_ICONS = { auto: '◐', dark: '☀', light: '🌙' };
+            function getThemeState() { return localStorage.getItem('theme') || 'auto'; }
+            function applyTheme(state) {
+                if (state === 'auto') {
+                    document.documentElement.removeAttribute('data-theme');
+                    localStorage.removeItem('theme');
+                } else {
+                    document.documentElement.setAttribute('data-theme', state);
+                    localStorage.setItem('theme', state);
+                }
+                document.getElementById('btn-theme').textContent = THEME_ICONS[state];
+            }
+            document.getElementById('btn-theme').addEventListener('click', function () {
+                applyTheme(THEME_CYCLE[getThemeState()]);
+            });
+            applyTheme(getThemeState());
+        })();
+
+        /* ── Resume UI ── */
+        var btnResume = document.getElementById('btn-resume');
+        var btnNewInstead = document.getElementById('btn-new-instead');
+        var resumeInfo = document.getElementById('resume-info');
+        var resumeActions = document.getElementById('resume-actions');
+
+        btnResume.addEventListener('click', function () {
+            var state = loadAutosave();
+            if (state) restoreFromAutosave(state);
+        });
+
+        btnNewInstead.addEventListener('click', function () {
+            clearAutosave();
+            resumeInfo.style.display = 'none';
+            resumeActions.style.display = 'none';
+            btnStart.style.display = '';
+        });
+
+        /* ── Init: check for autosave ── */
+        (function checkAutosave() {
+            var state = loadAutosave();
+            if (state) {
+                var pairs = state.totalPairs || 0;
+                var matched = state.matchedPairs || 0;
+                var mvs = state.moves || 0;
+                resumeInfo.textContent = 'Partie en cours : ' + pairs + ' paires, ' + matched + '/' + pairs + ' trouvées, ' + mvs + ' coup' + (mvs > 1 ? 's' : '');
+                resumeInfo.style.display = '';
+                resumeActions.style.display = 'flex';
+                resumeActions.style.justifyContent = 'center';
+                resumeActions.style.marginTop = '0.7rem';
+                btnStart.style.display = 'none';
+            }
+        })();
 
     })();
     </script>

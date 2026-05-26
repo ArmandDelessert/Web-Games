@@ -20,14 +20,21 @@
             --color-card: #ffffff;
             --color-border: #e0e0e0;
         }
-        @media (prefers-color-scheme: dark) {
-            :root {
+        :root:not([data-theme="light"]) {
+            @media (prefers-color-scheme: dark) {
                 --color-bg: #121212;
                 --color-fg: #e0e0e0;
                 --color-muted: #666;
                 --color-card: #1e1e1e;
                 --color-border: #333;
             }
+        }
+        :root[data-theme="dark"] {
+            --color-bg: #121212;
+            --color-fg: #e0e0e0;
+            --color-muted: #666;
+            --color-card: #1e1e1e;
+            --color-border: #333;
         }
 
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -38,7 +45,7 @@
             background: var(--color-bg);
             color: var(--color-fg);
             min-height: 100vh;
-            padding: 2rem 1rem;
+            padding: 3.5rem 1rem 2rem;
             display: flex; flex-direction: column; align-items: center;
         }
 
@@ -134,9 +141,30 @@
             margin-left: 0.35rem;
             vertical-align: 1px;
         }
+
+        /* ── Topbar ── */
+        #topbar {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            display: flex; justify-content: flex-end; align-items: center;
+            padding: 0.4rem 0.8rem;
+            background: var(--color-bg);
+            font-size: 0.85rem;
+        }
+        #btn-theme {
+            background: none; border: 1px solid var(--color-muted);
+            color: var(--color-fg); border-radius: 4px;
+            padding: 0.15rem 0.5rem; cursor: pointer; font-size: 0.85rem;
+        }
+        #btn-theme:hover { border-color: var(--color-fg); }
     </style>
+    <script>
+        (function(){var t=localStorage.getItem('theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.setAttribute('data-theme','dark');if(t==='light')document.documentElement.setAttribute('data-theme','light');})();
+    </script>
 </head>
 <body>
+    <nav id="topbar">
+        <button type="button" id="btn-theme" aria-label="Thème"></button>
+    </nav>
     <header>
         <h1>Web-Games</h1>
         <p class="subtitle">Collection de jeux web</p>
@@ -167,6 +195,26 @@
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js');
     }
+
+    (function () {
+        var THEME_CYCLE = { auto: 'dark', dark: 'light', light: 'auto' };
+        var THEME_ICONS = { auto: '◐', dark: '☀', light: '🌙' };
+        function getThemeState() { return localStorage.getItem('theme') || 'auto'; }
+        function applyTheme(state) {
+            if (state === 'auto') {
+                document.documentElement.removeAttribute('data-theme');
+                localStorage.removeItem('theme');
+            } else {
+                document.documentElement.setAttribute('data-theme', state);
+                localStorage.setItem('theme', state);
+            }
+            document.getElementById('btn-theme').textContent = THEME_ICONS[state];
+        }
+        document.getElementById('btn-theme').addEventListener('click', function () {
+            applyTheme(THEME_CYCLE[getThemeState()]);
+        });
+        applyTheme(getThemeState());
+    })();
 
     (function () {
         var MONTHS = ['jan.','fév.','mars','avr.','mai','juin',

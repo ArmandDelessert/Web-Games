@@ -13,13 +13,19 @@
             --color-trail: #bbb;
         }
 
-        @media (prefers-color-scheme: dark) {
-            :root {
+        :root:not([data-theme="light"]) {
+            @media (prefers-color-scheme: dark) {
                 --color-bg: #121212;
                 --color-fg: #e0e0e0;
                 --color-muted: #666;
                 --color-trail: #555;
             }
+        }
+        :root[data-theme="dark"] {
+            --color-bg: #121212;
+            --color-fg: #e0e0e0;
+            --color-muted: #666;
+            --color-trail: #555;
         }
 
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -29,6 +35,7 @@
             color: var(--color-fg);
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             min-height: 100vh; overflow: hidden;
+            padding-top: 1.8rem;
         }
         #game-container { position: relative; display: flex; flex-direction: column; align-items: center; }
         #info { font-size: 1.1rem; font-variant-numeric: tabular-nums; margin-bottom: 0.75rem; }
@@ -65,9 +72,33 @@
         .setting-ticks { display: flex; justify-content: space-between; padding: 0 7px; margin-top: 2px; }
         .setting-ticks span { width: 1px; height: 6px; background: var(--color-muted); }
         #settings.hidden { display: none; }
+
+        /* ── Topbar ── */
+        #topbar {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0.4rem 0.8rem;
+            background: var(--color-bg);
+            font-size: 0.85rem;
+        }
+        #topbar a { color: var(--color-muted); text-decoration: none; }
+        #topbar a:hover { color: var(--color-fg); }
+        #btn-theme {
+            background: none; border: 1px solid var(--color-muted);
+            color: var(--color-fg); border-radius: 4px;
+            padding: 0.15rem 0.5rem; cursor: pointer; font-size: 0.85rem;
+        }
+        #btn-theme:hover { border-color: var(--color-fg); }
     </style>
+    <script>
+        (function(){var t=localStorage.getItem('theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.setAttribute('data-theme','dark');if(t==='light')document.documentElement.setAttribute('data-theme','light');})();
+    </script>
 </head>
 <body>
+    <nav id="topbar">
+        <a href="../" id="btn-home">&#8592; Accueil</a>
+        <button type="button" id="btn-theme" aria-label="Thème"></button>
+    </nav>
     <div id="game-container">
         <p id="info">Zoom : ×1.0</p>
         <svg id="game-svg" xmlns="http://www.w3.org/2000/svg">
@@ -382,7 +413,7 @@
         /* ── Sizing ── */
         function resize() {
             var maxW = window.innerWidth - 32;
-            var maxH = window.innerHeight - 80;
+            var maxH = window.innerHeight - 110;
             var ratio = maxW / maxH;
             FIELD_W = 500;
             FIELD_H = Math.round(FIELD_W / ratio);
@@ -896,6 +927,25 @@
             if (!gameStarted) initGame();
             else initViewBox();
         });
+
+        /* ── Theme toggle ── */
+        var THEME_CYCLE = { auto: 'dark', dark: 'light', light: 'auto' };
+        var THEME_ICONS = { auto: '◐', dark: '☀', light: '🌙' };
+        function getThemeState() { return localStorage.getItem('theme') || 'auto'; }
+        function applyTheme(state) {
+            if (state === 'auto') {
+                document.documentElement.removeAttribute('data-theme');
+                localStorage.removeItem('theme');
+            } else {
+                document.documentElement.setAttribute('data-theme', state);
+                localStorage.setItem('theme', state);
+            }
+            document.getElementById('btn-theme').textContent = THEME_ICONS[state];
+        }
+        document.getElementById('btn-theme').addEventListener('click', function () {
+            applyTheme(THEME_CYCLE[getThemeState()]);
+        });
+        applyTheme(getThemeState());
 
         /* ── Init ── */
         var savedSpeed = loadSettings();
