@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Sudoku</title>
-    <meta name="description" content="Jeu de Sudoku en style monochrome, grille 6×6, 8×8 ou 9×9">
+    <meta name="description" content="Jeu de Sudoku en style monochrome, grille 4×4, 6×6, 8×8 ou 9×9">
     <style>
         :root {
             --color-bg: #fafafa;
@@ -185,8 +185,8 @@
                             <span>Grille</span>
                             <span class="setting-value" id="size-value">9 × 9</span>
                         </div>
-                        <input type="range" id="setting-size" min="0" max="2" step="1" value="2">
-                        <div class="setting-ticks"><span></span><span></span><span></span></div>
+                        <input type="range" id="setting-size" min="0" max="3" step="1" value="3">
+                        <div class="setting-ticks"><span></span><span></span><span></span><span></span></div>
                     </div>
                     <div class="setting-row">
                         <div class="setting-header">
@@ -206,6 +206,7 @@
     (function () {
         /* ── Config ── */
         var SIZE_CONFIGS = [
+            { n: 4, boxR: 2, boxC: 2, label: '4 × 4' },
             { n: 6, boxR: 2, boxC: 3, label: '6 × 6' },
             { n: 8, boxR: 2, boxC: 4, label: '8 × 8' },
             { n: 9, boxR: 3, boxC: 3, label: '9 × 9' }
@@ -213,6 +214,7 @@
         var DIFF_LABELS = ['Facile', 'Normale', 'Difficile'];
         // Proportion of cells kept as givens per [size][diff]
         var REVEAL_RATIO = {
+            4: [0.70, 0.60, 0.50],
             6: [0.60, 0.50, 0.40],
             8: [0.55, 0.45, 0.36],
             9: [0.50, 0.42, 0.33]
@@ -220,7 +222,7 @@
         var isTouchDevice = ('ontouchstart' in window);
 
         /* ── State ── */
-        var config = SIZE_CONFIGS[2];
+        var config = SIZE_CONFIGS[3];
         var solution = [];
         var puzzle = [];
         var userGrid = [];
@@ -661,6 +663,7 @@
             try {
                 localStorage.setItem('sudoku-size', settingSizeEl.value);
                 localStorage.setItem('sudoku-diff', settingDiffEl.value);
+                localStorage.setItem('sudoku-has-4x4', '1');
             } catch (e) {}
         }
 
@@ -668,7 +671,13 @@
             try {
                 var s = localStorage.getItem('sudoku-size');
                 var d = localStorage.getItem('sudoku-diff');
-                if (s !== null) settingSizeEl.value = s;
+                if (s !== null) {
+                    var sInt = parseInt(s, 10);
+                    // Migrate: before 4×4 was added, indices were 0=6×6,1=8×8,2=9×9.
+                    // The flag 'sudoku-has-4x4' marks that values are in the new scheme.
+                    if (!localStorage.getItem('sudoku-has-4x4') && sInt < 3) sInt += 1;
+                    settingSizeEl.value = Math.min(sInt, 3);
+                }
                 if (d !== null) settingDiffEl.value = d;
             } catch (e) {}
         }
