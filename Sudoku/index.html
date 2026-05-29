@@ -106,8 +106,8 @@
             margin-top: 0.75rem;
         }
         .num-btn {
-            aspect-ratio: 1;
-            display: flex; align-items: center; justify-content: center;
+            aspect-ratio: auto;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
             background: var(--color-bg);
             color: var(--color-fg);
             border: 1px solid var(--color-fg);
@@ -115,12 +115,19 @@
             font-size: calc(var(--grid-w) * 0.42 / var(--n));
             font-weight: 500;
             cursor: pointer;
-            padding: 0;
+            padding: 0.3rem 0;
             touch-action: manipulation;
         }
         .num-btn:active { background: var(--color-selected); }
         .num-btn.guide-valid { border-color: var(--color-guide); color: var(--color-guide); font-weight: 700; }
         .num-btn.done { opacity: 0.3; }
+        .num-remaining {
+            font-size: calc(var(--grid-w) * 0.22 / var(--n));
+            color: var(--color-muted);
+            font-weight: 400;
+            line-height: 1;
+        }
+        .num-btn.guide-valid .num-remaining { color: var(--color-guide); }
 
         #controls {
             display: flex; justify-content: center; gap: 0.5rem;
@@ -430,8 +437,13 @@
                 var btn = document.createElement('button');
                 btn.type = 'button';
                 btn.className = 'num-btn';
-                btn.textContent = i;
                 btn.dataset.num = i;
+                var numSpan = document.createElement('span');
+                numSpan.textContent = i;
+                btn.appendChild(numSpan);
+                var remSpan = document.createElement('span');
+                remSpan.className = 'num-remaining';
+                btn.appendChild(remSpan);
                 (function (num) {
                     btn.addEventListener('click', function () { inputNumber(num); });
                 })(i);
@@ -515,8 +527,11 @@
             var padBtns = padEl.children;
             for (var i = 0; i < padBtns.length; i++) {
                 var num = parseInt(padBtns[i].dataset.num, 10);
-                padBtns[i].classList.toggle('done', counts[num] >= n);
+                var remaining = n - counts[num];
+                padBtns[i].classList.toggle('done', remaining <= 0);
                 padBtns[i].classList.remove('guide-valid');
+                var remEl = padBtns[i].querySelector('.num-remaining');
+                if (remEl) remEl.textContent = remaining > 0 ? remaining : '';
             }
 
             if (guideActive && selected >= 0) {
