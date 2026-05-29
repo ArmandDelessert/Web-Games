@@ -340,8 +340,7 @@
             .then(function (r) { return r.json(); })
             .then(function (v) {
                 var d = new Date(v.date.replace(' ', 'T') + 'Z');
-                var label = v.commit + ' · '
-                    + d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()] + ' ' + d.getUTCFullYear()
+                var label = d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()] + ' ' + d.getUTCFullYear()
                     + ' ' + (d.getUTCHours() < 10 ? '0' : '') + d.getUTCHours()
                     + ':' + (d.getUTCMinutes() < 10 ? '0' : '') + d.getUTCMinutes();
                 document.getElementById('version-footer').textContent = label;
