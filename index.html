@@ -340,9 +340,12 @@
             .then(function (r) { return r.json(); })
             .then(function (v) {
                 var d = new Date(v.date.replace(' ', 'T') + 'Z');
-                var label = d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()] + ' ' + d.getUTCFullYear()
-                    + ' ' + (d.getUTCHours() < 10 ? '0' : '') + d.getUTCHours()
-                    + ':' + (d.getUTCMinutes() < 10 ? '0' : '') + d.getUTCMinutes();
+                var tz = Intl.DateTimeFormat('fr-CH', { timeZoneName: 'short' })
+                    .formatToParts(d).find(function (p) { return p.type === 'timeZoneName'; });
+                var label = d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear()
+                    + ' ' + (d.getHours() < 10 ? '0' : '') + d.getHours()
+                    + ':' + (d.getMinutes() < 10 ? '0' : '') + d.getMinutes()
+                    + (tz ? ' ' + tz.value : '');
                 document.getElementById('version-footer').textContent = label;
             })
             .catch(function () {});
