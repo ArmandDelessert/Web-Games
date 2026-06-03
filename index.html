@@ -1,346 +1,392 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web-Games</title>
-    <meta name="description" content="Collection de jeux web — puzzles et jeux d'adresse">
-    <link rel="icon" href="favicon.svg" type="image/svg+xml">
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)">
-    <meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <link rel="apple-touch-icon" href="favicon.svg">
-    <style>
-        :root {
-            --color-bg: #fafafa;
-            --color-fg: #1a1a1a;
-            --color-muted: #999;
-            --color-card: #ffffff;
-            --color-border: #e0e0e0;
-        }
-        :root:not([data-theme="light"]) {
-            @media (prefers-color-scheme: dark) {
-                --color-bg: #121212;
-                --color-fg: #e0e0e0;
-                --color-muted: #666;
-                --color-card: #1e1e1e;
-                --color-border: #333;
-            }
-        }
-        :root[data-theme="dark"] {
-            --color-bg: #121212;
-            --color-fg: #e0e0e0;
-            --color-muted: #666;
-            --color-card: #1e1e1e;
-            --color-border: #333;
-        }
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Web-Games</title>
+  <meta name="description" content="Collection de jeux web — puzzles et jeux d'adresse">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="apple-touch-icon" href="favicon.svg">
+  <style>
+    :root {
+      --color-bg: #fafafa;
+      --color-fg: #1a1a1a;
+      --color-muted: #999;
+      --color-card: #ffffff;
+      --color-border: #e0e0e0;
+    }
 
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root:not([data-theme="light"]) {
+      @media (prefers-color-scheme: dark) {
+        --color-bg: #121212;
+        --color-fg: #e0e0e0;
+        --color-muted: #666;
+        --color-card: #1e1e1e;
+        --color-border: #333;
+      }
+    }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-                         "Helvetica Neue", Arial, sans-serif;
-            background: var(--color-bg);
-            color: var(--color-fg);
-            min-height: 100vh;
-            padding: 3.5rem 1rem 2rem;
-            display: flex; flex-direction: column; align-items: center;
-        }
+    :root[data-theme="dark"] {
+      --color-bg: #121212;
+      --color-fg: #e0e0e0;
+      --color-muted: #666;
+      --color-card: #1e1e1e;
+      --color-border: #333;
+    }
 
-        header {
-            text-align: center;
-            margin-bottom: 2.5rem;
-        }
-        h1 {
-            font-size: 1.8rem;
-            font-weight: 700;
-            margin-bottom: 0.3rem;
-        }
-        .subtitle {
-            color: var(--color-muted);
-            font-size: 0.9rem;
-        }
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
-        main {
-            width: min(600px, 100%);
-        }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, sans-serif;
+      background: var(--color-bg);
+      color: var(--color-fg);
+      min-height: 100vh;
+      padding: 3.5rem 1rem 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
 
-        h2 {
-            font-size: 1rem;
-            font-weight: 600;
-            color: var(--color-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 0.75rem;
-        }
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
 
-        .game-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-            gap: 0.75rem;
-            margin-bottom: 2rem;
-        }
+    h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      margin-bottom: 0.3rem;
+    }
 
-        .game-link {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 1.2rem 0.8rem;
-            background: var(--color-card);
-            border: 1px solid var(--color-border);
-            border-radius: 8px;
-            text-decoration: none;
-            color: var(--color-fg);
-            font-size: 1.05rem;
-            font-weight: 500;
-            transition: border-color 0.15s, background 0.15s;
-        }
-        .game-link:hover {
-            border-color: var(--color-fg);
-        }
+    .subtitle {
+      color: var(--color-muted);
+      font-size: 0.9rem;
+    }
 
-        /* ── History section ── */
-        #history-section {
-            margin-top: 0.5rem;
-        }
-        .history-entry {
-            padding: 0.6rem 0.8rem;
-            background: var(--color-card);
-            border: 1px solid var(--color-border);
-            border-radius: 8px;
-            margin-bottom: 0.5rem;
-        }
-        .history-main {
-            display: flex;
-            justify-content: space-between;
-            align-items: baseline;
-            gap: 0.5rem;
-        }
-        .history-game {
-            font-weight: 500;
-            font-size: 0.95rem;
-        }
-        .history-date {
-            color: var(--color-muted);
-            font-size: 0.8rem;
-            white-space: nowrap;
-        }
-        .history-details {
-            color: var(--color-muted);
-            font-size: 0.82rem;
-            margin-top: 0.15rem;
-        }
-        .history-aid {
-            display: inline-block;
-            border: 1px solid var(--color-border);
-            border-radius: 3px;
-            padding: 0 0.3rem;
-            font-size: 0.72rem;
-            margin-left: 0.35rem;
-            vertical-align: 1px;
-        }
+    main {
+      width: min(600px, 100%);
+    }
 
-        /* ── Topbar ── */
-        #topbar {
-            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-            display: flex; justify-content: flex-end; align-items: center;
-            padding: 0.4rem 0.8rem;
-            background: var(--color-bg);
-            font-size: 0.85rem;
-        }
-        #btn-theme {
-            background: none; border: 1px solid var(--color-muted);
-            color: var(--color-fg); border-radius: 4px;
-            padding: 0.15rem 0.5rem; cursor: pointer; font-size: 0.85rem;
-        }
-        #btn-theme:hover { border-color: var(--color-fg); }
+    h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--color-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.75rem;
+    }
 
-        /* ── Footer ── */
-        footer {
-            margin-top: 2rem;
-            text-align: center;
-            font-size: 0.85rem;
-            display: flex;
-            flex-direction: column;
-            gap: 0.4rem;
-        }
-        footer a { color: var(--color-muted); text-decoration: none; }
-        footer a:hover { text-decoration: underline; }
-        .footer-copyright, .footer-version { color: var(--color-muted); }
-    </style>
-    <script>
-        (function(){var t=localStorage.getItem('theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.setAttribute('data-theme','dark');if(t==='light')document.documentElement.setAttribute('data-theme','light');})();
-    </script>
+    .game-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 2rem;
+    }
+
+    .game-link {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.2rem 0.8rem;
+      background: var(--color-card);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      text-decoration: none;
+      color: var(--color-fg);
+      font-size: 1.05rem;
+      font-weight: 500;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .game-link:hover {
+      border-color: var(--color-fg);
+    }
+
+    /* ── History section ── */
+    #history-section {
+      margin-top: 0.5rem;
+    }
+
+    .history-entry {
+      padding: 0.6rem 0.8rem;
+      background: var(--color-card);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      margin-bottom: 0.5rem;
+    }
+
+    .history-main {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 0.5rem;
+    }
+
+    .history-game {
+      font-weight: 500;
+      font-size: 0.95rem;
+    }
+
+    .history-date {
+      color: var(--color-muted);
+      font-size: 0.8rem;
+      white-space: nowrap;
+    }
+
+    .history-details {
+      color: var(--color-muted);
+      font-size: 0.82rem;
+      margin-top: 0.15rem;
+    }
+
+    .history-aid {
+      display: inline-block;
+      border: 1px solid var(--color-border);
+      border-radius: 3px;
+      padding: 0 0.3rem;
+      font-size: 0.72rem;
+      margin-left: 0.35rem;
+      vertical-align: 1px;
+    }
+
+    /* ── Topbar ── */
+    #topbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      padding: 0.4rem 0.8rem;
+      background: var(--color-bg);
+      font-size: 0.85rem;
+    }
+
+    #btn-theme {
+      background: none;
+      border: 1px solid var(--color-muted);
+      color: var(--color-fg);
+      border-radius: 4px;
+      padding: 0.15rem 0.5rem;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+
+    #btn-theme:hover {
+      border-color: var(--color-fg);
+    }
+
+    /* ── Footer ── */
+    footer {
+      margin-top: 2rem;
+      text-align: center;
+      font-size: 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    footer a {
+      color: var(--color-muted);
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    .footer-copyright,
+    .footer-version {
+      color: var(--color-muted);
+    }
+  </style>
+  <script>
+    (function () { var t = localStorage.getItem('theme'); if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme:dark)').matches)) document.documentElement.setAttribute('data-theme', 'dark'); if (t === 'light') document.documentElement.setAttribute('data-theme', 'light'); })();
+  </script>
 </head>
+
 <body>
-    <nav id="topbar">
-        <button type="button" id="btn-theme" aria-label="Thème"></button>
-    </nav>
-    <header>
-        <h1>Web-Games</h1>
-        <p class="subtitle">Collection de jeux web</p>
-    </header>
-    <main>
-        <section>
-            <h2>Puzzles</h2>
-            <div class="game-list">
-                <a class="game-link" href="Sudoku/">Sudoku</a>
-                <a class="game-link" href="Yakazu/">Yakazu</a>
-                <a class="game-link" href="Memory/">Memory</a>
-            </div>
-        </section>
-        <section>
-            <h2>Adresse</h2>
-            <div class="game-list">
-                <a class="game-link" href="Snake/">Snake</a>
-                <a class="game-link" href="ZooKeeper/">ZooKeeper</a>
-                <a class="game-link" href="Billard/">Billard</a>
-            </div>
-        </section>
-        <section id="history-section" style="display:none">
-            <h2>Dernières parties</h2>
-            <div id="history-list"></div>
-        </section>
-    </main>
-    <footer>
-        <p class="footer-source">
-            <a href="https://github.com/ArmandDelessert/Web-Games">Code source sur GitHub</a>
-        </p>
-        <p class="footer-copyright">© <span id="footer-year"></span> Armand Delessert</p>
-        <p class="footer-version" id="footer-version"></p>
-    </footer>
-    <script>
+  <nav id="topbar">
+    <button type="button" id="btn-theme" aria-label="Thème"></button>
+  </nav>
+  <header>
+    <h1>Web-Games</h1>
+    <p class="subtitle">Collection de jeux web</p>
+  </header>
+  <main>
+    <section>
+      <h2>Puzzles</h2>
+      <div class="game-list">
+        <a class="game-link" href="Sudoku/">Sudoku</a>
+        <a class="game-link" href="Yakazu/">Yakazu</a>
+        <a class="game-link" href="Memory/">Memory</a>
+      </div>
+    </section>
+    <section>
+      <h2>Adresse</h2>
+      <div class="game-list">
+        <a class="game-link" href="Snake/">Snake</a>
+        <a class="game-link" href="ZooKeeper/">ZooKeeper</a>
+        <a class="game-link" href="Billard/">Billard</a>
+      </div>
+    </section>
+    <section id="history-section" style="display:none">
+      <h2>Dernières parties</h2>
+      <div id="history-list"></div>
+    </section>
+  </main>
+  <footer>
+    <p class="footer-source">
+      <a href="https://github.com/ArmandDelessert/Web-Games">Code source sur GitHub</a>
+    </p>
+    <p class="footer-copyright">© <span id="footer-year"></span> Armand Delessert</p>
+    <p class="footer-version" id="footer-version"></p>
+  </footer>
+  <script>
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js');
+      navigator.serviceWorker.register('sw.js');
     }
 
     (function () {
-        var THEME_CYCLE = { auto: 'dark', dark: 'light', light: 'auto' };
-        var THEME_ICONS = { auto: '◐', dark: '☀️', light: '🌙' };
-        function getThemeState() { return localStorage.getItem('theme') || 'auto'; }
-        function applyTheme(state) {
-            if (state === 'auto') {
-                document.documentElement.removeAttribute('data-theme');
-                localStorage.removeItem('theme');
-            } else {
-                document.documentElement.setAttribute('data-theme', state);
-                localStorage.setItem('theme', state);
-            }
-            document.getElementById('btn-theme').textContent = THEME_ICONS[state];
+      var THEME_CYCLE = { auto: 'dark', dark: 'light', light: 'auto' };
+      var THEME_ICONS = { auto: '◐', dark: '☀️', light: '🌙' };
+      function getThemeState() { return localStorage.getItem('theme') || 'auto'; }
+      function applyTheme(state) {
+        if (state === 'auto') {
+          document.documentElement.removeAttribute('data-theme');
+          localStorage.removeItem('theme');
+        } else {
+          document.documentElement.setAttribute('data-theme', state);
+          localStorage.setItem('theme', state);
         }
-        document.getElementById('btn-theme').addEventListener('click', function () {
-            applyTheme(THEME_CYCLE[getThemeState()]);
-        });
-        applyTheme(getThemeState());
+        document.getElementById('btn-theme').textContent = THEME_ICONS[state];
+      }
+      document.getElementById('btn-theme').addEventListener('click', function () {
+        applyTheme(THEME_CYCLE[getThemeState()]);
+      });
+      applyTheme(getThemeState());
     })();
 
     (function () {
-        var MONTHS = ['jan.','fév.','mars','avr.','mai','juin',
-                      'juil.','août','sept.','oct.','nov.','déc.'];
-        var DIFF_LABELS = ['Facile', 'Normale', 'Difficile'];
+      var MONTHS = ['jan.', 'fév.', 'mars', 'avr.', 'mai', 'juin',
+        'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+      var DIFF_LABELS = ['Facile', 'Normale', 'Difficile'];
 
-        function load(key) {
-            try { return JSON.parse(localStorage.getItem(key)) || []; }
-            catch (e) { return []; }
+      function load(key) {
+        try { return JSON.parse(localStorage.getItem(key)) || []; }
+        catch (e) { return []; }
+      }
+
+      function fmtDuration(ms) {
+        var s = Math.floor(ms / 1000);
+        var m = Math.floor(s / 60);
+        s %= 60;
+        return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+      }
+
+      function fmtDate(iso) {
+        var d = new Date(iso);
+        return d.getDate() + ' ' + MONTHS[d.getMonth()] + ' '
+          + (d.getHours() < 10 ? '0' : '') + d.getHours() + ':'
+          + (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
+      }
+
+      function fmtSize(e) {
+        if (e.game === 'Memory') return e.size.pairs + ' paires';
+        return e.size + '×' + e.size;
+      }
+
+      function fmtStats(e) {
+        if (e.game === 'Memory') {
+          var t = e.stats.moves + ' coup' + (e.stats.moves > 1 ? 's' : '');
+          if (e.stats.firstTry) t += ' · ' + e.stats.firstTry + ' du 1er coup';
+          return t;
         }
+        var p = [];
+        if (e.stats.correct) p.push(e.stats.correct + ' ✓');
+        if (e.stats.incorrect) p.push(e.stats.incorrect + ' ✗');
+        return p.join(' · ');
+      }
 
-        function fmtDuration(ms) {
-            var s = Math.floor(ms / 1000);
-            var m = Math.floor(s / 60);
-            s %= 60;
-            return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+      function getAids(e) {
+        var a = [];
+        if (e.game === 'Memory') {
+          if (e.aids && e.aids.seen) a.push('Cartes vues');
+        } else {
+          if (e.aids && e.aids.errors) a.push('Erreurs');
+          if (e.aids && e.aids.guide) a.push('Guide');
         }
+        return a;
+      }
 
-        function fmtDate(iso) {
-            var d = new Date(iso);
-            return d.getDate() + ' ' + MONTHS[d.getMonth()] + ' '
-                + (d.getHours() < 10 ? '0' : '') + d.getHours() + ':'
-                + (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
-        }
+      var all = [];
+      load('sudoku-history').forEach(function (e) { e.game = 'Sudoku'; all.push(e); });
+      load('yakazu-history').forEach(function (e) { e.game = 'Yakazu'; all.push(e); });
+      load('memory-history').forEach(function (e) { e.game = 'Memory'; all.push(e); });
 
-        function fmtSize(e) {
-            if (e.game === 'Memory') return e.size.pairs + ' paires';
-            return e.size + '×' + e.size;
-        }
+      if (!all.length) return;
 
-        function fmtStats(e) {
-            if (e.game === 'Memory') {
-                var t = e.stats.moves + ' coup' + (e.stats.moves > 1 ? 's' : '');
-                if (e.stats.firstTry) t += ' · ' + e.stats.firstTry + ' du 1er coup';
-                return t;
-            }
-            var p = [];
-            if (e.stats.correct) p.push(e.stats.correct + ' ✓');
-            if (e.stats.incorrect) p.push(e.stats.incorrect + ' ✗');
-            return p.join(' · ');
-        }
+      all.sort(function (a, b) { return b.date.localeCompare(a.date); });
+      var recent = all.slice(0, 20);
 
-        function getAids(e) {
-            var a = [];
-            if (e.game === 'Memory') {
-                if (e.aids && e.aids.seen) a.push('Cartes vues');
-            } else {
-                if (e.aids && e.aids.errors) a.push('Erreurs');
-                if (e.aids && e.aids.guide) a.push('Guide');
-            }
-            return a;
-        }
+      var section = document.getElementById('history-section');
+      var list = document.getElementById('history-list');
+      section.style.display = '';
 
-        var all = [];
-        load('sudoku-history').forEach(function (e) { e.game = 'Sudoku'; all.push(e); });
-        load('yakazu-history').forEach(function (e) { e.game = 'Yakazu'; all.push(e); });
-        load('memory-history').forEach(function (e) { e.game = 'Memory'; all.push(e); });
+      recent.forEach(function (entry) {
+        var div = document.createElement('div');
+        div.className = 'history-entry';
 
-        if (!all.length) return;
+        var main = document.createElement('div');
+        main.className = 'history-main';
 
-        all.sort(function (a, b) { return b.date.localeCompare(a.date); });
-        var recent = all.slice(0, 20);
+        var label = entry.game + ' · ' + fmtSize(entry);
+        if (entry.difficulty !== undefined) label += ' · ' + DIFF_LABELS[entry.difficulty];
 
-        var section = document.getElementById('history-section');
-        var list = document.getElementById('history-list');
-        section.style.display = '';
+        var nameEl = document.createElement('span');
+        nameEl.className = 'history-game';
+        nameEl.textContent = label;
+        main.appendChild(nameEl);
 
-        recent.forEach(function (entry) {
-            var div = document.createElement('div');
-            div.className = 'history-entry';
+        var dateEl = document.createElement('span');
+        dateEl.className = 'history-date';
+        dateEl.textContent = fmtDate(entry.date);
+        main.appendChild(dateEl);
 
-            var main = document.createElement('div');
-            main.className = 'history-main';
+        div.appendChild(main);
 
-            var label = entry.game + ' · ' + fmtSize(entry);
-            if (entry.difficulty !== undefined) label += ' · ' + DIFF_LABELS[entry.difficulty];
+        var details = document.createElement('div');
+        details.className = 'history-details';
+        var dt = fmtDuration(entry.duration);
+        var st = fmtStats(entry);
+        if (st) dt += ' · ' + st;
+        details.textContent = dt;
 
-            var nameEl = document.createElement('span');
-            nameEl.className = 'history-game';
-            nameEl.textContent = label;
-            main.appendChild(nameEl);
-
-            var dateEl = document.createElement('span');
-            dateEl.className = 'history-date';
-            dateEl.textContent = fmtDate(entry.date);
-            main.appendChild(dateEl);
-
-            div.appendChild(main);
-
-            var details = document.createElement('div');
-            details.className = 'history-details';
-            var dt = fmtDuration(entry.duration);
-            var st = fmtStats(entry);
-            if (st) dt += ' · ' + st;
-            details.textContent = dt;
-
-            getAids(entry).forEach(function (aid) {
-                var badge = document.createElement('span');
-                badge.className = 'history-aid';
-                badge.textContent = aid;
-                details.appendChild(badge);
-            });
-
-            div.appendChild(details);
-            list.appendChild(div);
+        getAids(entry).forEach(function (aid) {
+          var badge = document.createElement('span');
+          badge.className = 'history-aid';
+          badge.textContent = aid;
+          details.appendChild(badge);
         });
+
+        div.appendChild(details);
+        list.appendChild(div);
+      });
     })();
 
     // Année du copyright
@@ -348,16 +394,17 @@
 
     // Date de dernière mise à jour
     fetch('version.json')
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-            var d = new Date(data.date);
-            if (isNaN(d.getTime())) return;
-            var dateStr = d.toLocaleDateString('fr-CH', { day: 'numeric', month: 'long', year: 'numeric' });
-            var timeStr = d.toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' });
-            document.getElementById('footer-version').textContent =
-                'Dernière mise à jour le ' + dateStr + ' à ' + timeStr + '.';
-        })
-        .catch(function () {});
-    </script>
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var d = new Date(data.date);
+        if (isNaN(d.getTime())) return;
+        var dateStr = d.toLocaleDateString('fr-CH', { day: 'numeric', month: 'long', year: 'numeric' });
+        var timeStr = d.toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' });
+        document.getElementById('footer-version').textContent =
+          'Dernière mise à jour le ' + dateStr + ' à ' + timeStr + '.';
+      })
+      .catch(function () { });
+  </script>
 </body>
+
 </html>
