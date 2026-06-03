@@ -200,6 +200,17 @@
       flex-direction: column;
       gap: 0.4rem;
     }
+    .footer-links {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 0.4rem 0.75rem;
+    }
+    .footer-sep { color: var(--color-border); }
+    footer a { color: var(--color-muted); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+    .footer-copyright, .footer-version { color: var(--color-muted); }
 
     footer a {
       color: var(--color-muted);
@@ -250,13 +261,18 @@
       <div id="history-list"></div>
     </section>
   </main>
+
   <footer>
+    <div class="footer-links">
+      <a href="https://armanddelessert.github.io/">ArmandDelessert.github.io</a>
+    </div>
     <p class="footer-source">
       <a href="https://github.com/ArmandDelessert/Web-Games">Code source sur GitHub</a>
     </p>
     <p class="footer-copyright">© <span id="footer-year"></span> Armand Delessert</p>
     <p class="footer-version" id="footer-version"></p>
   </footer>
+
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js');
@@ -401,9 +417,10 @@
         var dateStr = d.toLocaleDateString('fr-CH', { day: 'numeric', month: 'long', year: 'numeric' });
         var timeStr = d.toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' });
         document.getElementById('footer-version').textContent =
-          'Dernière mise à jour le ' + dateStr + ' à ' + timeStr + '.';
+          'Mis à jour le ' + dateStr + ' à ' + timeStr + '.';
       })
-      .catch(function () { });
+      .catch(function () {});
+
   </script>
 </body>
 
