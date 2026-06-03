@@ -157,13 +157,18 @@
         }
         #btn-theme:hover { border-color: var(--color-fg); }
 
-        /* ── Version footer ── */
-        #version-footer {
+        /* ── Footer ── */
+        footer {
             margin-top: 2rem;
-            color: var(--color-muted);
-            font-size: 0.75rem;
-            font-variant-numeric: tabular-nums;
+            text-align: center;
+            font-size: 0.85rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
         }
+        footer a { color: var(--color-muted); text-decoration: none; }
+        footer a:hover { text-decoration: underline; }
+        .footer-copyright, .footer-version { color: var(--color-muted); }
     </style>
     <script>
         (function(){var t=localStorage.getItem('theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.setAttribute('data-theme','dark');if(t==='light')document.documentElement.setAttribute('data-theme','light');})();
@@ -199,7 +204,13 @@
             <div id="history-list"></div>
         </section>
     </main>
-    <footer id="version-footer"></footer>
+    <footer>
+        <p class="footer-source">
+            <a href="https://github.com/ArmandDelessert/Web-Games">Code source sur GitHub</a>
+        </p>
+        <p class="footer-copyright">© <span id="footer-year"></span> Armand Delessert</p>
+        <p class="footer-version" id="footer-version"></p>
+    </footer>
     <script>
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js');
@@ -332,24 +343,21 @@
         });
     })();
 
-    /* ── Version footer ── */
-    (function () {
-        var MONTHS = ['jan.','fév.','mars','avr.','mai','juin',
-                      'juil.','août','sept.','oct.','nov.','déc.'];
-        fetch('version.json')
-            .then(function (r) { return r.json(); })
-            .then(function (v) {
-                var d = new Date(v.date.replace(' ', 'T') + 'Z');
-                var tz = Intl.DateTimeFormat('fr-CH', { timeZoneName: 'short' })
-                    .formatToParts(d).find(function (p) { return p.type === 'timeZoneName'; });
-                var label = d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear()
-                    + ' ' + (d.getHours() < 10 ? '0' : '') + d.getHours()
-                    + ':' + (d.getMinutes() < 10 ? '0' : '') + d.getMinutes()
-                    + (tz ? ' ' + tz.value : '');
-                document.getElementById('version-footer').textContent = label;
-            })
-            .catch(function () {});
-    })();
+    // Année du copyright
+    document.getElementById('footer-year').textContent = new Date().getFullYear();
+
+    // Date de dernière mise à jour
+    fetch('version.json')
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            var d = new Date(data.date);
+            if (isNaN(d.getTime())) return;
+            var dateStr = d.toLocaleDateString('fr-CH', { day: 'numeric', month: 'long', year: 'numeric' });
+            var timeStr = d.toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' });
+            document.getElementById('footer-version').textContent =
+                'Dernière mise à jour le ' + dateStr + ' à ' + timeStr + '.';
+        })
+        .catch(function () {});
     </script>
 </body>
 </html>
