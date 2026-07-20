@@ -295,6 +295,7 @@
         var usedGuide = false;
         var correctCount = 0;
         var incorrectCount = 0;
+        var victoryTimeout = 0;
 
         /* ── DOM ── */
         var containerEl = document.getElementById('game-container');
@@ -883,13 +884,18 @@
                 stats: { correct: correctCount, incorrect: incorrectCount },
                 log: gameLog
             });
-            setTimeout(showVictory, 250);
+            victoryTimeout = setTimeout(showVictory, 250);
         }
 
         function showVictory() {
             overlayTitleEl.textContent = 'Bravo\u00a0!';
             finalTimeEl.textContent = 'Temps\u00a0: ' + formatTime(elapsedBeforePause);
             startHintEl.textContent = isTouchDevice ? 'Toucher pour rejouer' : 'Appuyer sur « Espace » pour rejouer';
+            // Reset overlay to normal mode (a resumed game may have left
+            // the resume UI showing and #settings hidden).
+            document.getElementById('resume-info').style.display = 'none';
+            document.getElementById('resume-actions').style.display = 'none';
+            document.getElementById('settings').style.display = '';
             overlayEl.classList.remove('hidden');
         }
 
@@ -929,8 +935,10 @@
         }
         function saveHistory(record) {
             try {
+                delete record.log;            // don't persist the per-move log (unbounded)
                 var hist = loadHistory();
                 hist.push(record);
+                if (hist.length > 100) hist = hist.slice(-100);   // cap growth
                 localStorage.setItem('yakazu-history', JSON.stringify(hist));
             } catch (e) {}
         }
@@ -976,6 +984,7 @@
         }
 
         function showOverlayForNewGame() {
+            clearTimeout(victoryTimeout);
             stopTimer();
             gameStarted = false;
             gameCompleted = false;

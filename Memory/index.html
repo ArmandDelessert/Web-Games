@@ -233,7 +233,7 @@
             <div class="setting-row">
                 <div class="setting-header">
                     <span>Paires</span>
-                    <span class="setting-value" id="pairs-value">5 paires</span>
+                    <span class="setting-value" id="pairs-value">10 paires</span>
                 </div>
                 <input type="range" id="setting-pairs" min="0" max="17" step="1" value="2">
                 <div class="setting-ticks"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
@@ -349,8 +349,10 @@
         (function loadSettings() {
             try {
                 var v = localStorage.getItem('memory-pairs');
-                if (v !== null) { settingPairs.value = v; selectedPairs = parseInt(v, 10); }
+                if (v !== null) settingPairs.value = v;
             } catch (e) {}
+            // Slider value is the single source of truth (avoids default desync).
+            selectedPairs = parseInt(settingPairs.value, 10);
             updatePairsLabel();
         })();
 
@@ -547,8 +549,10 @@
         }
         function saveHistory(record) {
             try {
+                delete record.log;            // don't persist the per-move log (unbounded)
                 var hist = loadHistory();
                 hist.push(record);
+                if (hist.length > 100) hist = hist.slice(-100);   // cap growth
                 localStorage.setItem('memory-history', JSON.stringify(hist));
             } catch (e) {}
         }
@@ -620,6 +624,11 @@
 
         btnReplay.addEventListener('click', function () {
             winOvl.classList.remove('open');
+            // Reset the overlay to its normal "start" state — otherwise a game
+            // that was resumed leaves the (now dead) resume UI showing.
+            document.getElementById('resume-info').style.display = 'none';
+            document.getElementById('resume-actions').style.display = 'none';
+            document.getElementById('btn-start').style.display = '';
             overlay.classList.remove('hidden');
         });
 
