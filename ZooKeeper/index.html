@@ -887,7 +887,7 @@
         }
 
         document.addEventListener('touchstart', function (e) {
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'LABEL') return;
+            if (e.target.closest('#topbar') || e.target.tagName === 'INPUT' || e.target.tagName === 'LABEL') return;
             touchStartX = e.touches[0].clientX;
             touchStartY = e.touches[0].clientY;
             if (gameStarted && !gameOver) {
@@ -898,7 +898,7 @@
         }, { passive: false });
 
         document.addEventListener('touchmove', function (e) {
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'LABEL') return;
+            if (e.target.closest('#topbar') || e.target.tagName === 'INPUT' || e.target.tagName === 'LABEL') return;
             e.preventDefault();
             if (!gameStarted || gameOver) return;
             var dir = getTouchZoneDir(e.touches[0].clientX, e.touches[0].clientY);
@@ -907,7 +907,7 @@
         }, { passive: false });
 
         document.addEventListener('touchend', function (e) {
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'LABEL') return;
+            if (e.target.closest('#topbar') || e.target.tagName === 'INPUT' || e.target.tagName === 'LABEL') return;
             keysDown = {};
             if (touchStartX !== undefined) {
                 var dx = e.changedTouches[0].clientX - touchStartX;

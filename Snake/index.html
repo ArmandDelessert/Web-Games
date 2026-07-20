@@ -240,28 +240,29 @@
 
         /* ── Sizing ── */
         function resize() {
-            var maxW = window.innerWidth - 32;
-            var maxH = window.innerHeight - 110;
+            var maxW = Math.max(120, window.innerWidth - 32);
+            var maxH = Math.max(120, window.innerHeight - 110);
 
-            // Compute field height from screen ratio
-            FIELD_H = FIELD_W * maxH / maxW;
+            // During an active game, keep the play field fixed. Recomputing FIELD_H
+            // could put the snake out of bounds → instant (unfair) game over. The
+            // SVG keeps its aspect ratio and just letterboxes into the new space.
+            if (!gameStarted || gameOver) {
+                FIELD_H = FIELD_W * maxH / maxW;
+                svgEl.setAttribute('viewBox', '0 0 ' + FIELD_W + ' ' + FIELD_H);
 
-            svgEl.setAttribute('viewBox', '0 0 ' + FIELD_W + ' ' + FIELD_H);
+                bgEl.setAttribute('width', FIELD_W);
+                bgEl.setAttribute('height', FIELD_H);
+                borderEl.setAttribute('width', FIELD_W);
+                borderEl.setAttribute('height', FIELD_H);
 
-            // Update background and border rects
-            bgEl.setAttribute('width', FIELD_W);
-            bgEl.setAttribute('height', FIELD_H);
-            borderEl.setAttribute('width', FIELD_W);
-            borderEl.setAttribute('height', FIELD_H);
+                // If food is out of bounds after resize, reposition it
+                if (food.x > FIELD_W - FOOD_R || food.y > FIELD_H - FOOD_R) {
+                    spawnFood();
+                }
+            }
 
-            // SVG fills available space (viewBox ratio = element ratio → no letterboxing)
             svgEl.style.width = maxW + 'px';
             svgEl.style.height = maxH + 'px';
-
-            // If food is out of bounds after resize, reposition it
-            if (food.x > FIELD_W - FOOD_R || food.y > FIELD_H - FOOD_R) {
-                spawnFood();
-            }
 
             render();
         }
