@@ -1,10 +1,14 @@
-var CACHE = 'web-games-v3';
+var CACHE = 'web-games-v4';
 var PRECACHE = [
     './',
     'index.html',
     'manifest.json',
     'favicon.svg',
     'version.json',
+    'icons/icon-192.png',
+    'icons/icon-512.png',
+    'icons/icon-maskable-512.png',
+    'icons/apple-touch-icon.png',
     'shared/base.css',
     'shared/shell.js',
     'Sudoku/index.html',
