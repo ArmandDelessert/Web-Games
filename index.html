@@ -13,6 +13,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="apple-touch-icon" href="favicon.svg">
+  <link rel="stylesheet" href="shared/base.css">
   <style>
     :root {
       --color-bg: #fafafa;
@@ -163,33 +164,9 @@
     }
 
     /* ── Topbar ── */
-    #topbar {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      z-index: 100;
-      display: flex;
-      justify-content: flex-end;
-      align-items: center;
-      padding: 0.4rem 0.8rem;
-      background: var(--color-bg);
-      font-size: 0.85rem;
-    }
+    #topbar { justify-content: flex-end; }
 
-    #btn-theme {
-      background: none;
-      border: 1px solid var(--color-muted);
-      color: var(--color-fg);
-      border-radius: 4px;
-      padding: 0.15rem 0.5rem;
-      cursor: pointer;
-      font-size: 0.85rem;
-    }
 
-    #btn-theme:hover {
-      border-color: var(--color-fg);
-    }
 
     /* ── Footer ── */
     footer {
@@ -227,8 +204,9 @@
     }
   </style>
   <script>
-    (function () { var t = localStorage.getItem('theme'); if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme:dark)').matches)) document.documentElement.setAttribute('data-theme', 'dark'); if (t === 'light') document.documentElement.setAttribute('data-theme', 'light'); })();
+    (function () { var t = localStorage.getItem('theme'); if (t) document.documentElement.setAttribute('data-theme', t); })();
   </script>
+  <script src="shared/shell.js" defer></script>
 </head>
 
 <body>
@@ -277,28 +255,6 @@
       navigator.serviceWorker.register('sw.js');
     }
 
-    (function () {
-      var THEME_CYCLE = { auto: 'dark', dark: 'light', light: 'auto' };
-      var THEME_ICONS = { auto: '◐', dark: '☀️', light: '🌙' };
-      var THEME_LABELS = { auto: 'Thème automatique, appuyer pour passer en sombre', dark: 'Thème sombre, appuyer pour passer en clair', light: 'Thème clair, appuyer pour revenir en automatique' };
-      function getThemeState() { return localStorage.getItem('theme') || 'auto'; }
-      function applyTheme(state) {
-        if (state === 'auto') {
-          document.documentElement.removeAttribute('data-theme');
-          localStorage.removeItem('theme');
-        } else {
-          document.documentElement.setAttribute('data-theme', state);
-          localStorage.setItem('theme', state);
-        }
-        var btnThemeEl = document.getElementById('btn-theme');
-        btnThemeEl.textContent = THEME_ICONS[state];
-        btnThemeEl.setAttribute('aria-label', THEME_LABELS[state]);
-      }
-      document.getElementById('btn-theme').addEventListener('click', function () {
-        applyTheme(THEME_CYCLE[getThemeState()]);
-      });
-      applyTheme(getThemeState());
-    })();
 
     (function () {
       var MONTHS = ['jan.', 'fév.', 'mars', 'avr.', 'mai', 'juin',

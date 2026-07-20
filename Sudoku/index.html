@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sudoku</title>
     <meta name="description" content="Jeu de Sudoku en style monochrome, grille 4×4, 6×6, 8×8 ou 9×9">
+    <link rel="stylesheet" href="../shared/base.css">
     <style>
         :root {
             --color-bg: #fafafa;
@@ -41,7 +42,6 @@
             --color-guide: #5ba0e8;
         }
 
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
@@ -162,59 +162,17 @@
         .setting-row { display: flex; flex-direction: column; gap: 0.25rem; }
         .setting-header { display: flex; justify-content: space-between; font-size: 0.9rem; }
         .setting-value { font-variant-numeric: tabular-nums; }
-        input[type="range"] {
-            -webkit-appearance: none; appearance: none; width: 100%; height: 6px;
-            background: var(--color-muted); border-radius: 3px; outline: none; cursor: pointer;
-        }
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none; appearance: none; width: 16px; height: 16px;
-            background: var(--color-fg); border-radius: 50%; cursor: pointer;
-        }
-        input[type="range"]::-moz-range-thumb {
-            width: 16px; height: 16px; background: var(--color-fg); border: none;
-            border-radius: 50%; cursor: pointer;
-        }
-        input[type="range"]:focus-visible {
-            outline: 2px solid var(--color-fg); outline-offset: 3px;
-        }
         .setting-ticks { display: flex; justify-content: space-between; padding: 0 7px; margin-top: 2px; }
         .setting-ticks span { width: 1px; height: 6px; background: var(--color-muted); }
 
-        #topbar {
-            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 0.4rem 0.8rem;
-            background: var(--color-bg);
-            font-size: 0.85rem;
-        }
-        #topbar a { color: var(--color-muted); text-decoration: none; }
-        #topbar a:hover { color: var(--color-fg); }
-        #btn-theme {
-            background: none; border: 1px solid var(--color-muted);
-            color: var(--color-fg); border-radius: 4px;
-            padding: 0.15rem 0.5rem; cursor: pointer; font-size: 0.85rem;
-        }
-        #btn-theme:hover { border-color: var(--color-fg); }
 
         @media (max-width: 380px) {
             .ctl-btn { font-size: 0.8rem; padding: 0.4rem 0.5rem; }
         }
 
-        /* ── Storage warning toast ── */
-        #storage-warning {
-            position: fixed; left: 50%; bottom: 1rem; z-index: 200;
-            transform: translateX(-50%) translateY(150%);
-            background: var(--color-fg); color: var(--color-bg);
-            padding: 0.6rem 1rem; border-radius: 6px;
-            font-size: 0.8rem; line-height: 1.3;
-            max-width: min(90vw, 380px); text-align: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.25);
-            transition: transform 0.25s ease;
-            pointer-events: none;
-        }
-        #storage-warning.show { transform: translateX(-50%) translateY(0); }
     </style>
 <script>(function(){var t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t)})()</script>
+    <script src="../shared/shell.js" defer></script>
 </head>
 <body>
     <nav id="topbar">
@@ -1005,27 +963,6 @@
             }
         });
 
-        /* ── Theme toggle ── */
-        var THEME_CYCLE = { auto: 'dark', dark: 'light', light: 'auto' };
-        var THEME_ICONS = { auto: '◐', dark: '☀️', light: '🌙' };
-        var THEME_LABELS = { auto: 'Thème automatique, appuyer pour passer en sombre', dark: 'Thème sombre, appuyer pour passer en clair', light: 'Thème clair, appuyer pour revenir en automatique' };
-        function getThemeState() { return localStorage.getItem('theme') || 'auto'; }
-        function applyTheme(state) {
-            if (state === 'auto') {
-                document.documentElement.removeAttribute('data-theme');
-                localStorage.removeItem('theme');
-            } else {
-                document.documentElement.setAttribute('data-theme', state);
-                localStorage.setItem('theme', state);
-            }
-            var btnThemeEl = document.getElementById('btn-theme');
-            btnThemeEl.textContent = THEME_ICONS[state];
-            btnThemeEl.setAttribute('aria-label', THEME_LABELS[state]);
-        }
-        document.getElementById('btn-theme').addEventListener('click', function () {
-            applyTheme(THEME_CYCLE[getThemeState()]);
-        });
-        applyTheme(getThemeState());
 
         /* ── Init ── */
         loadSettings();

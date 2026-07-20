@@ -1,10 +1,12 @@
-var CACHE = 'web-games-v2';
+var CACHE = 'web-games-v3';
 var PRECACHE = [
     './',
     'index.html',
     'manifest.json',
     'favicon.svg',
     'version.json',
+    'shared/base.css',
+    'shared/shell.js',
     'Sudoku/index.html',
     'Yakazu/index.html',
     'Memory/index.html',
