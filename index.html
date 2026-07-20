@@ -17,7 +17,7 @@
     :root {
       --color-bg: #fafafa;
       --color-fg: #1a1a1a;
-      --color-muted: #999;
+      --color-muted: #757575;
       --color-card: #ffffff;
       --color-border: #e0e0e0;
     }
@@ -26,7 +26,7 @@
       @media (prefers-color-scheme: dark) {
         --color-bg: #121212;
         --color-fg: #e0e0e0;
-        --color-muted: #666;
+        --color-muted: #999;
         --color-card: #1e1e1e;
         --color-border: #333;
       }
@@ -35,7 +35,7 @@
     :root[data-theme="dark"] {
       --color-bg: #121212;
       --color-fg: #e0e0e0;
-      --color-muted: #666;
+      --color-muted: #999;
       --color-card: #1e1e1e;
       --color-border: #333;
     }
@@ -280,6 +280,7 @@
     (function () {
       var THEME_CYCLE = { auto: 'dark', dark: 'light', light: 'auto' };
       var THEME_ICONS = { auto: '◐', dark: '☀️', light: '🌙' };
+      var THEME_LABELS = { auto: 'Thème automatique, appuyer pour passer en sombre', dark: 'Thème sombre, appuyer pour passer en clair', light: 'Thème clair, appuyer pour revenir en automatique' };
       function getThemeState() { return localStorage.getItem('theme') || 'auto'; }
       function applyTheme(state) {
         if (state === 'auto') {
@@ -289,7 +290,9 @@
           document.documentElement.setAttribute('data-theme', state);
           localStorage.setItem('theme', state);
         }
-        document.getElementById('btn-theme').textContent = THEME_ICONS[state];
+        var btnThemeEl = document.getElementById('btn-theme');
+        btnThemeEl.textContent = THEME_ICONS[state];
+        btnThemeEl.setAttribute('aria-label', THEME_LABELS[state]);
       }
       document.getElementById('btn-theme').addEventListener('click', function () {
         applyTheme(THEME_CYCLE[getThemeState()]);

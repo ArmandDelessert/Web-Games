@@ -2,27 +2,27 @@
 <html lang="fr">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Snake</title>
     <meta name="description" content="Jeu du serpent continu en style monochrome">
     <style>
         :root {
             --color-bg: #fafafa;
             --color-fg: #1a1a1a;
-            --color-muted: #999;
+            --color-muted: #757575;
         }
 
         :root:not([data-theme="light"]) {
             @media (prefers-color-scheme: dark) {
                 --color-bg: #121212;
                 --color-fg: #e0e0e0;
-                --color-muted: #666;
+                --color-muted: #999;
             }
         }
         :root[data-theme="dark"] {
             --color-bg: #121212;
             --color-fg: #e0e0e0;
-            --color-muted: #666;
+            --color-muted: #999;
         }
 
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -73,6 +73,9 @@
             width: 16px; height: 16px; background: var(--color-fg); border: none;
             border-radius: 50%; cursor: pointer;
         }
+        input[type="range"]:focus-visible {
+            outline: 2px solid var(--color-fg); outline-offset: 3px;
+        }
         .setting-ticks { display: flex; justify-content: space-between; padding: 0 7px; margin-top: 2px; }
         .setting-ticks span { width: 1px; height: 6px; background: var(--color-muted); }
         #settings.hidden { display: none; }
@@ -114,12 +117,12 @@
         </svg>
         <div id="overlay">
             <div id="overlay-text">
-                <p id="game-over-text">Snake</p>
+                <p id="game-over-text" role="status" aria-live="polite">Snake</p>
                 <p id="final-score"></p>
                 <div id="settings">
                     <div class="setting-row">
                         <div class="setting-header">
-                            <span>Vitesse</span>
+                            <label for="setting-speed">Vitesse</label>
                             <span class="setting-value" id="speed-value">Normale</span>
                         </div>
                         <input type="range" id="setting-speed" min="0" max="3" step="1" value="1">
@@ -476,6 +479,7 @@
         function updateSettingLabels() {
             var si = parseInt(settingSpeedEl.value, 10);
             speedValueEl.textContent = SPEED_LABELS[si];
+            settingSpeedEl.setAttribute('aria-valuetext', SPEED_LABELS[si]);
         }
 
         settingSpeedEl.addEventListener('input', function () {
@@ -594,6 +598,7 @@
         /* ── Theme toggle ── */
         var THEME_CYCLE = { auto: 'dark', dark: 'light', light: 'auto' };
         var THEME_ICONS = { auto: '◐', dark: '☀️', light: '🌙' };
+        var THEME_LABELS = { auto: 'Thème automatique, appuyer pour passer en sombre', dark: 'Thème sombre, appuyer pour passer en clair', light: 'Thème clair, appuyer pour revenir en automatique' };
         function getThemeState() { return localStorage.getItem('theme') || 'auto'; }
         function applyTheme(state) {
             if (state === 'auto') {
@@ -603,7 +608,9 @@
                 document.documentElement.setAttribute('data-theme', state);
                 localStorage.setItem('theme', state);
             }
-            document.getElementById('btn-theme').textContent = THEME_ICONS[state];
+            var btnThemeEl = document.getElementById('btn-theme');
+            btnThemeEl.textContent = THEME_ICONS[state];
+            btnThemeEl.setAttribute('aria-label', THEME_LABELS[state]);
         }
         document.getElementById('btn-theme').addEventListener('click', function () {
             applyTheme(THEME_CYCLE[getThemeState()]);
