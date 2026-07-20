@@ -2,14 +2,14 @@
 <html lang="fr">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Yakazu</title>
     <meta name="description" content="Yakazu — Jeu de logique en style monochrome, grille 5×5 / 7×7 / 9×9">
     <style>
         :root {
             --color-bg: #fafafa;
             --color-fg: #1a1a1a;
-            --color-muted: #999;
+            --color-muted: #757575;
             --color-related: #ececec;
             --color-same: #dcdcdc;
             --color-selected: #c4c4c4;
@@ -21,7 +21,7 @@
             :root:not([data-theme="light"]) {
                 --color-bg: #121212;
                 --color-fg: #e0e0e0;
-                --color-muted: #666;
+                --color-muted: #999;
                 --color-related: #1e1e1e;
                 --color-same: #2a2a2a;
                 --color-selected: #3a3a3a;
@@ -33,7 +33,7 @@
         :root[data-theme="dark"] {
             --color-bg: #121212;
             --color-fg: #e0e0e0;
-            --color-muted: #666;
+            --color-muted: #999;
             --color-related: #1e1e1e;
             --color-same: #2a2a2a;
             --color-selected: #3a3a3a;
@@ -203,12 +203,29 @@
             width: 16px; height: 16px; background: var(--color-fg); border: none;
             border-radius: 50%; cursor: pointer;
         }
+        input[type="range"]:focus-visible {
+            outline: 2px solid var(--color-fg); outline-offset: 3px;
+        }
         .setting-ticks { display: flex; justify-content: space-between; padding: 0 7px; margin-top: 2px; }
         .setting-ticks span { width: 1px; height: 6px; background: var(--color-muted); }
 
         @media (max-width: 380px) {
             .ctl-btn { font-size: 0.8rem; padding: 0.4rem 0.5rem; }
         }
+
+        /* ── Storage warning toast ── */
+        #storage-warning {
+            position: fixed; left: 50%; bottom: 1rem; z-index: 200;
+            transform: translateX(-50%) translateY(150%);
+            background: var(--color-fg); color: var(--color-bg);
+            padding: 0.6rem 1rem; border-radius: 6px;
+            font-size: 0.8rem; line-height: 1.3;
+            max-width: min(90vw, 380px); text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+            transition: transform 0.25s ease;
+            pointer-events: none;
+        }
+        #storage-warning.show { transform: translateX(-50%) translateY(0); }
     </style>
 <script>(function(){var t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t)})()</script>
 </head>
@@ -229,12 +246,12 @@
         </div>
         <div id="overlay">
             <div id="overlay-text">
-                <p id="overlay-title">Yakazu</p>
+                <p id="overlay-title" role="status" aria-live="polite">Yakazu</p>
                 <p id="final-time"></p>
                 <div id="settings">
                     <div class="setting-row">
                         <div class="setting-header">
-                            <span>Grille</span>
+                            <label for="setting-size">Grille</label>
                             <span class="setting-value" id="size-value">7 × 7</span>
                         </div>
                         <input type="range" id="setting-size" min="0" max="2" step="1" value="1">
@@ -242,7 +259,7 @@
                     </div>
                     <div class="setting-row">
                         <div class="setting-header">
-                            <span>Difficulté</span>
+                            <label for="setting-diff">Difficulté</label>
                             <span class="setting-value" id="diff-value">Normale</span>
                         </div>
                         <input type="range" id="setting-diff" min="0" max="2" step="1" value="1">
@@ -933,14 +950,67 @@
             try { return JSON.parse(localStorage.getItem('yakazu-history')) || []; }
             catch (e) { return []; }
         }
-        function saveHistory(record) {
+        var storageWarnShown = false;
+
+        function getStorageUsageBytes() {
+            var total = 0;
             try {
-                delete record.log;            // don't persist the per-move log (unbounded)
-                var hist = loadHistory();
-                hist.push(record);
-                if (hist.length > 100) hist = hist.slice(-100);   // cap growth
-                localStorage.setItem('yakazu-history', JSON.stringify(hist));
+                for (var i = 0; i < localStorage.length; i++) {
+                    var k = localStorage.key(i);
+                    var v = localStorage.getItem(k) || '';
+                    total += (k.length + v.length) * 2; // UTF-16 → ~2 bytes/char
+                }
             } catch (e) {}
+            return total;
+        }
+
+        function showStorageWarning(msg) {
+            try {
+                var el = document.getElementById('storage-warning');
+                if (!el) {
+                    el = document.createElement('div');
+                    el.id = 'storage-warning';
+                    document.body.appendChild(el);
+                }
+                el.textContent = msg;
+                el.classList.add('show');
+                clearTimeout(el._hideTimer);
+                el._hideTimer = setTimeout(function () { el.classList.remove('show'); }, 6000);
+            } catch (e) {}
+        }
+
+        function checkStorageUsage() {
+            if (storageWarnShown) return;
+            var bytes = getStorageUsageBytes();
+            if (bytes > 4 * 1024 * 1024) {
+                storageWarnShown = true;
+                showStorageWarning('Stockage bientôt plein (' + (bytes / 1024 / 1024).toFixed(1) + ' Mo utilisés) : les parties les plus anciennes seront supprimées automatiquement si nécessaire.');
+            }
+        }
+
+        function saveHistory(record) {
+            var hist = loadHistory();
+            hist.push(record);
+            var trimmed = 0;
+            while (true) {
+                try {
+                    localStorage.setItem('yakazu-history', JSON.stringify(hist));
+                    break;
+                } catch (e) {
+                    if (hist.length > 1) {
+                        hist.shift();
+                        trimmed++;
+                    } else {
+                        showStorageWarning("Stockage plein : cette partie n'a pas pu être enregistrée dans l'historique.");
+                        return;
+                    }
+                }
+            }
+            if (trimmed > 0) {
+                showStorageWarning('Stockage plein : ' + trimmed + ' ancienne' + (trimmed > 1 ? 's' : '') + ' partie' + (trimmed > 1 ? 's supprimées' : ' supprimée') + " de l'historique.");
+            } else {
+                checkStorageUsage();
+            }
         }
 
         /* ── Auto-save ── */
@@ -958,7 +1028,7 @@
                     correctCount: correctCount, incorrectCount: incorrectCount
                 };
                 localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data));
-            } catch (e) {}
+            } catch (e) { console.warn('Autosave failed:', e); }
         }
         function loadAutosave() {
             try { var d = localStorage.getItem(AUTOSAVE_KEY); return d ? JSON.parse(d) : null; }
@@ -1002,8 +1072,12 @@
 
         /* ── Settings ── */
         function updateLabels() {
-            sizeValueEl.textContent = SIZE_CONFIGS[parseInt(settingSizeEl.value, 10)].label;
-            diffValueEl.textContent = DIFF_LABELS[parseInt(settingDiffEl.value, 10)];
+            var sizeLabel = SIZE_CONFIGS[parseInt(settingSizeEl.value, 10)].label;
+            var diffLabel = DIFF_LABELS[parseInt(settingDiffEl.value, 10)];
+            sizeValueEl.textContent = sizeLabel;
+            diffValueEl.textContent = diffLabel;
+            settingSizeEl.setAttribute('aria-valuetext', sizeLabel);
+            settingDiffEl.setAttribute('aria-valuetext', diffLabel);
         }
 
         function saveSettings() {
@@ -1185,6 +1259,7 @@
         /* ── Theme toggle ── */
         var THEME_CYCLE = { auto: 'dark', dark: 'light', light: 'auto' };
         var THEME_ICONS = { auto: '◐', dark: '☀️', light: '🌙' };
+        var THEME_LABELS = { auto: 'Thème automatique, appuyer pour passer en sombre', dark: 'Thème sombre, appuyer pour passer en clair', light: 'Thème clair, appuyer pour revenir en automatique' };
         function getThemeState() { return localStorage.getItem('theme') || 'auto'; }
         function applyTheme(state) {
             if (state === 'auto') {
@@ -1194,7 +1269,9 @@
                 document.documentElement.setAttribute('data-theme', state);
                 localStorage.setItem('theme', state);
             }
-            document.getElementById('btn-theme').textContent = THEME_ICONS[state];
+            var btnThemeEl = document.getElementById('btn-theme');
+            btnThemeEl.textContent = THEME_ICONS[state];
+            btnThemeEl.setAttribute('aria-label', THEME_LABELS[state]);
         }
         document.getElementById('btn-theme').addEventListener('click', function () {
             applyTheme(THEME_CYCLE[getThemeState()]);

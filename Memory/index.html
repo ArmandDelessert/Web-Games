@@ -2,14 +2,14 @@
 <html lang="fr">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Memory</title>
     <meta name="description" content="Jeu de memory avec emojis, grille SVG">
     <style>
         :root {
             --color-bg: #fafafa;
             --color-fg: #1a1a1a;
-            --color-muted: #999;
+            --color-muted: #757575;
             --color-card-back: #e0e0e0;
             --color-card-front: #ffffff;
             --color-matched: #d4d4d4;
@@ -19,7 +19,7 @@
             :root:not([data-theme="light"]) {
                 --color-bg: #121212;
                 --color-fg: #e0e0e0;
-                --color-muted: #666;
+                --color-muted: #999;
                 --color-card-back: #2a2a2a;
                 --color-card-front: #1e1e1e;
                 --color-matched: #333;
@@ -29,7 +29,7 @@
         :root[data-theme="dark"] {
             --color-bg: #121212;
             --color-fg: #e0e0e0;
-            --color-muted: #666;
+            --color-muted: #999;
             --color-card-back: #2a2a2a;
             --color-card-front: #1e1e1e;
             --color-matched: #333;
@@ -176,6 +176,9 @@
             width: 16px; height: 16px; background: var(--color-fg); border: none;
             border-radius: 50%; cursor: pointer;
         }
+        input[type="range"]:focus-visible {
+            outline: 2px solid var(--color-fg); outline-offset: 3px;
+        }
         .setting-ticks { display: flex; justify-content: space-between; padding: 0 7px; margin-top: 2px; }
         .setting-ticks span { width: 1px; height: 6px; background: var(--color-muted); }
 
@@ -204,6 +207,20 @@
             padding: 0.5rem 1.5rem; background: var(--color-fg); color: var(--color-bg);
             border: none; border-radius: 6px; font-size: 0.95rem; cursor: pointer;
         }
+
+        /* ── Storage warning toast ── */
+        #storage-warning {
+            position: fixed; left: 50%; bottom: 1rem; z-index: 200;
+            transform: translateX(-50%) translateY(150%);
+            background: var(--color-fg); color: var(--color-bg);
+            padding: 0.6rem 1rem; border-radius: 6px;
+            font-size: 0.8rem; line-height: 1.3;
+            max-width: min(90vw, 380px); text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+            transition: transform 0.25s ease;
+            pointer-events: none;
+        }
+        #storage-warning.show { transform: translateX(-50%) translateY(0); }
     </style>
     <script>
         (function(){var t=localStorage.getItem('theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.setAttribute('data-theme','dark');if(t==='light')document.documentElement.setAttribute('data-theme','light');})();
@@ -232,7 +249,7 @@
         <div id="settings">
             <div class="setting-row">
                 <div class="setting-header">
-                    <span>Paires</span>
+                    <label for="setting-pairs">Paires</label>
                     <span class="setting-value" id="pairs-value">10 paires</span>
                 </div>
                 <input type="range" id="setting-pairs" min="0" max="17" step="1" value="2">
@@ -251,7 +268,7 @@
     <div id="win-overlay">
         <div id="win-box">
             <h2>Bravo !</h2>
-            <p id="win-stats"></p>
+            <p id="win-stats" role="status" aria-live="polite"></p>
             <button id="btn-replay">Rejouer</button>
         </div>
     </div>
@@ -337,7 +354,9 @@
         /* ── Settings ── */
         function updatePairsLabel() {
             var idx = parseInt(settingPairs.value, 10);
-            pairsValueEl.textContent = PAIR_OPTIONS[idx].pairs + ' paires';
+            var label = PAIR_OPTIONS[idx].pairs + ' paires';
+            pairsValueEl.textContent = label;
+            settingPairs.setAttribute('aria-valuetext', label);
         }
 
         settingPairs.addEventListener('input', function () {
@@ -547,14 +566,67 @@
             try { return JSON.parse(localStorage.getItem('memory-history')) || []; }
             catch (e) { return []; }
         }
-        function saveHistory(record) {
+        var storageWarnShown = false;
+
+        function getStorageUsageBytes() {
+            var total = 0;
             try {
-                delete record.log;            // don't persist the per-move log (unbounded)
-                var hist = loadHistory();
-                hist.push(record);
-                if (hist.length > 100) hist = hist.slice(-100);   // cap growth
-                localStorage.setItem('memory-history', JSON.stringify(hist));
+                for (var i = 0; i < localStorage.length; i++) {
+                    var k = localStorage.key(i);
+                    var v = localStorage.getItem(k) || '';
+                    total += (k.length + v.length) * 2; // UTF-16 → ~2 bytes/char
+                }
             } catch (e) {}
+            return total;
+        }
+
+        function showStorageWarning(msg) {
+            try {
+                var el = document.getElementById('storage-warning');
+                if (!el) {
+                    el = document.createElement('div');
+                    el.id = 'storage-warning';
+                    document.body.appendChild(el);
+                }
+                el.textContent = msg;
+                el.classList.add('show');
+                clearTimeout(el._hideTimer);
+                el._hideTimer = setTimeout(function () { el.classList.remove('show'); }, 6000);
+            } catch (e) {}
+        }
+
+        function checkStorageUsage() {
+            if (storageWarnShown) return;
+            var bytes = getStorageUsageBytes();
+            if (bytes > 4 * 1024 * 1024) {
+                storageWarnShown = true;
+                showStorageWarning('Stockage bientôt plein (' + (bytes / 1024 / 1024).toFixed(1) + ' Mo utilisés) : les parties les plus anciennes seront supprimées automatiquement si nécessaire.');
+            }
+        }
+
+        function saveHistory(record) {
+            var hist = loadHistory();
+            hist.push(record);
+            var trimmed = 0;
+            while (true) {
+                try {
+                    localStorage.setItem('memory-history', JSON.stringify(hist));
+                    break;
+                } catch (e) {
+                    if (hist.length > 1) {
+                        hist.shift();
+                        trimmed++;
+                    } else {
+                        showStorageWarning("Stockage plein : cette partie n'a pas pu être enregistrée dans l'historique.");
+                        return;
+                    }
+                }
+            }
+            if (trimmed > 0) {
+                showStorageWarning('Stockage plein : ' + trimmed + ' ancienne' + (trimmed > 1 ? 's' : '') + ' partie' + (trimmed > 1 ? 's supprimées' : ' supprimée') + " de l'historique.");
+            } else {
+                checkStorageUsage();
+            }
         }
 
         /* ── Autosave ── */
@@ -581,7 +653,7 @@
                     firstTryCount: firstTryCount
                 };
                 localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(state));
-            } catch (e) {}
+            } catch (e) { console.warn('Autosave failed:', e); }
         }
         function loadAutosave() {
             try {
@@ -698,6 +770,7 @@
         (function () {
             var THEME_CYCLE = { auto: 'dark', dark: 'light', light: 'auto' };
             var THEME_ICONS = { auto: '◐', dark: '☀️', light: '🌙' };
+            var THEME_LABELS = { auto: 'Thème automatique, appuyer pour passer en sombre', dark: 'Thème sombre, appuyer pour passer en clair', light: 'Thème clair, appuyer pour revenir en automatique' };
             function getThemeState() { return localStorage.getItem('theme') || 'auto'; }
             function applyTheme(state) {
                 if (state === 'auto') {
@@ -707,7 +780,9 @@
                     document.documentElement.setAttribute('data-theme', state);
                     localStorage.setItem('theme', state);
                 }
-                document.getElementById('btn-theme').textContent = THEME_ICONS[state];
+                var btnThemeEl = document.getElementById('btn-theme');
+                btnThemeEl.textContent = THEME_ICONS[state];
+                btnThemeEl.setAttribute('aria-label', THEME_LABELS[state]);
             }
             document.getElementById('btn-theme').addEventListener('click', function () {
                 applyTheme(THEME_CYCLE[getThemeState()]);
