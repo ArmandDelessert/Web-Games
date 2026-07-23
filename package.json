@@ -1,0 +1,13 @@
+{
+    "name": "web-games",
+    "private": true,
+    "description": "Collection de jeux web — puzzles et jeux d'adresse",
+    "scripts": {
+        "lint": "node scripts/lint.js",
+        "test": "node --test",
+        "check": "npm run lint && npm test"
+    },
+    "engines": {
+        "node": ">=20"
+    }
+}
