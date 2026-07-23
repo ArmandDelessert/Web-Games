@@ -238,6 +238,7 @@
         </div>
     </div>
 
+    <script src="memory-logic.js"></script>
     <script>
     (function () {
         'use strict';
@@ -255,34 +256,6 @@
         ];
 
         /* ── Pair options with suggested grid dimensions ── */
-        var PAIR_OPTIONS = [
-            { pairs: 6,  cols: 4,  rows: 3  },
-            { pairs: 8,  cols: 4,  rows: 4  },
-            { pairs: 10, cols: 5,  rows: 4  },
-            { pairs: 12, cols: 6,  rows: 4  },
-            { pairs: 15, cols: 6,  rows: 5  },
-            { pairs: 18, cols: 6,  rows: 6  },
-            { pairs: 21, cols: 7,  rows: 6  },
-            { pairs: 24, cols: 8,  rows: 6  },
-            { pairs: 28, cols: 8,  rows: 7  },
-            { pairs: 32, cols: 8,  rows: 8  },
-            { pairs: 35, cols: 10, rows: 7  },
-            { pairs: 40, cols: 10, rows: 8  },
-            { pairs: 45, cols: 10, rows: 9  },
-            { pairs: 50, cols: 10, rows: 10 },
-            { pairs: 54, cols: 12, rows: 9  },
-            { pairs: 60, cols: 12, rows: 10 },
-            { pairs: 66, cols: 12, rows: 11 },
-            { pairs: 72, cols: 12, rows: 12 }
-        ];
-
-        function computeGrid(option) {
-            var landscape = window.innerWidth >= window.innerHeight;
-            var cols = landscape ? Math.max(option.cols, option.rows) : Math.min(option.cols, option.rows);
-            var rows = landscape ? Math.min(option.cols, option.rows) : Math.max(option.cols, option.rows);
-            return { cols: cols, rows: rows };
-        }
-
         /* Card geometry (SVG units) */
         var CARD = 80, GAP = 8;
 
@@ -341,17 +314,9 @@
         })();
 
         /* ── Shuffle ── */
-        function shuffle(arr) {
-            for (var i = arr.length - 1; i > 0; i--) {
-                var j = Math.floor(Math.random() * (i + 1));
-                var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
-            }
-            return arr;
-        }
-
         /* ── Build SVG grid ── */
         function buildGrid(option, deckOverride) {
-            var layout = computeGrid(option);
+            var layout = computeGrid(option, window.innerWidth >= window.innerHeight);
             var cols = layout.cols, rows = layout.rows;
             var pairs = option.pairs;
             var vbW = cols * (CARD + GAP) + GAP;
